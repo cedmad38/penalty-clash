@@ -1413,7 +1413,7 @@ function updateScoreUI(){
     }
     const isTurn=(si===0&&match.turn==="A")||(si===1&&match.turn==="B");
     const idx=arr.length;
-    if(isTurn&&idx<dots.length&&(match.phase==="aim"||match.phase==="guess"||match.phase==="run"))dots[idx].classList.add("next");
+    if(isTurn&&idx<dots.length&&(match.phase==="aim"||match.phase==="power"||match.phase==="guess"||match.phase==="run"))dots[idx].classList.add("next");
   });
 }
 /* — qui tire, qui garde — */
@@ -1445,6 +1445,7 @@ function checkEnd(){
 
 function nextKick(){
   if(state!=="match")return;
+  clearTimeout(match.powerTimeout); drag.on=false;
   resetBall(); gk.dive=null; gk.diveT=0; shooter.kick=0; shooter.celebrate=0; shooter.sad=0;
   match.outcome=null; match.aim=null; match.keeperZone=null; match.playerZone=null;
   match.kickRands=null; match.kickCurve=null;
@@ -1519,8 +1520,40 @@ function beginAim(){
   shooter.visible=true; shooter.run=0;
   gk.kit=match.mode==="2p"?(match.turn==="A"?KIT_GK_AI:KIT_GK_P):KIT_GK_AI;
   if(!match.decisive)banner(match.mode==="2p"?(match.turn==="A"?match.names[0]:match.names[1])+" — TIRE !":"À TOI DE TIRER","gold-t");
-  hint("Glisse depuis le ballon vers le but — plus c'est long, plus c'est fort");
+  hint("Glisse depuis le ballon vers le but pour viser");
   updateScoreUI();
+}
+/* — puissance en 2 temps : viser, puis toucher la jauge pile sur la zone dorée — */
+function currentPowerPos(){
+  const period=1.05;
+  const el=performance.now()/1000-match.powerStart;
+  const f=(el/period)%2;
+  return f<1?f:2-f; // aller-retour 0 → 1 → 0
+}
+function beginPowerCharge(target){
+  match.phase="power";
+  match.powerTarget=target;
+  match.powerStart=performance.now()/1000;
+  match.sweetLo=.82; match.sweetHi=.94;
+  match.wasInSweet=false;
+  hint("Touche l'écran pile sur la zone dorée !");
+  clearTimeout(match.powerTimeout);
+  match.powerTimeout=setTimeout(()=>{ if(match.phase==="power")lockPower(currentPowerPos()); },3200);
+}
+function lockPower(pos){
+  if(match.phase!=="power")return;
+  clearTimeout(match.powerTimeout);
+  const sweet=pos>=match.sweetLo&&pos<=match.sweetHi;
+  const power=sweet?1:clamp(pos,.18,1);
+  const errMul=sweet?.45:1;
+  const err=(.14+power*.55)*errMul;
+  const t=match.powerTarget;
+  match.aim={x:t.x+rnd(-err,err),y:clamp(t.y+rnd(-err*.7,err*.7),.05,3.4)};
+  match.power=power;
+  hint("");
+  if(sweet){ bigWord("PARFAIT !","g"); buzz([10,10,30]); }
+  else buzz(16);
+  startRun();
 }
 function beginGuess(){
   match.phase="guess";
@@ -1557,17 +1590,18 @@ function startAIRun(){
 }
 
 /* — visée du joueur (drag) — */
-const drag={on:false,sx:0,sy:0,cx:0,cy:0,tick:0};
+const drag={on:false,sx:0,sy:0,cx:0,cy:0};
 canvas.addEventListener("pointerdown",e=>{
   if(state==="splash"){ return; }
-  if(state!=="match"||match.phase!=="aim")return;
-  drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY; drag.tick=0;
+  if(state!=="match")return;
+  if(match.phase==="aim"){
+    drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY;
+  } else if(match.phase==="power"){
+    lockPower(currentPowerPos());
+  }
 });
 canvas.addEventListener("pointermove",e=>{
   if(!drag.on)return; drag.cx=e.clientX; drag.cy=e.clientY;
-  const pw=clamp(Math.hypot(drag.cx-drag.sx,drag.sy-drag.cy)/(H*.42),.16,1);
-  const stage=pw>.9?3:pw>.62?2:pw>.32?1:0;
-  if(stage>drag.tick){ drag.tick=stage; buzz(stage===3?[14,10,14]:10); }
 });
 window.addEventListener("pointerup",e=>{
   if(!drag.on)return; drag.on=false;
@@ -1575,14 +1609,9 @@ window.addEventListener("pointerup",e=>{
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
   const len=Math.hypot(dx,dy);
   if(len<22)return; // trop court = annulé
-  const power=clamp(len/(H*.42),.16,1);
   const t=dragTarget();
-  // bruit de précision : plus fort = moins précis
-  const err=.14+power*.55;
-  match.aim={x:t.x+rnd(-err,err),y:clamp(t.y+rnd(-err*.7,err*.7),.05,3.4)};
-  match.power=power;
   hint("");
-  startRun();
+  beginPowerCharge(t);
 });
 function dragTarget(){
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
@@ -1869,7 +1898,7 @@ function countUp(sel,val,dur,prefix){
 function drawShooter(t){
   const kit=match.turn==="A"?match.kits[0]:match.kits[1];
   let px,pz,pose={},facing=1;
-  if(match.phase==="aim"||match.phase==="guess"||match.phase==="secretpick"||match.phase==="waitzone"){
+  if(match.phase==="aim"||match.phase==="power"||match.phase==="guess"||match.phase==="secretpick"||match.phase==="waitzone"){
     // attente : respiration + regard vers le but
     const br=Math.sin(t*2.2)*.02;
     px=1.05; pz=-1.05;
@@ -1977,42 +2006,69 @@ function hideZoneGrid(){ $("#zone-grid").classList.remove("show"); }
 
 /* visée : flèche + réticule pendant le drag */
 function drawAimOverlay(){
-  if(state!=="match"||match.phase!=="aim"||!drag.on)return;
-  const t=dragTarget();
-  const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
-  const b=proj(0,.11,0);
-  const len=Math.hypot(drag.cx-drag.sx,drag.sy-drag.cy);
-  const pw=clamp(len/(H*.42),.16,1);
-  // courbe de visée — plus la puissance monte, plus le trait s'épaissit et rougeoie
-  ctx.strokeStyle=pw>.85?"rgba(255,150,80,.8)":`rgba(63,214,255,.65)`;
-  ctx.lineWidth=2.5+pw*3; ctx.setLineDash([7,9]);
-  ctx.beginPath(); ctx.moveTo(b.x,b.y);
-  ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
-  ctx.setLineDash([]);
-  // réticule
-  ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
-  ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
-  ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
+  if(state!=="match")return;
+  if(match.phase==="aim"&&drag.on){
+    const t=dragTarget();
+    const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
+    const b=proj(0,.11,0);
+    ctx.strokeStyle="rgba(63,214,255,.65)"; ctx.lineWidth=3; ctx.setLineDash([7,9]);
+    ctx.beginPath(); ctx.moveTo(b.x,b.y);
+    ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
+    ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
+    ctx.font="700 13px -apple-system,sans-serif"; ctx.fillStyle="rgba(200,220,250,.85)";
+    ctx.textAlign="center"; ctx.fillText("Lâche pour viser cette zone",W/2,H*.80);
+    return;
+  }
+  if(match.phase==="power"){
+    // réticule figé sur la cible choisie à l'étape précédente
+    const t=match.powerTarget;
+    const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
+    const b=proj(0,.11,0);
+    ctx.strokeStyle="rgba(63,214,255,.55)"; ctx.lineWidth=2.5; ctx.setLineDash([7,9]);
+    ctx.beginPath(); ctx.moveTo(b.x,b.y);
+    ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
+    ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
 
-  // jauge de puissance — grande, zones colorées, libellé qui change
-  const gw=Math.min(220,W*.68), gx=W/2-gw/2, gy=H*.80, gh=20;
-  const pulse=pw>.9?1+Math.sin(performance.now()/70)*.06:1;
-  ctx.save(); ctx.translate(W/2,gy+gh/2); ctx.scale(pulse,pulse); ctx.translate(-W/2,-(gy+gh/2));
-  ctx.fillStyle="rgba(8,16,36,.78)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
-  ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
-  roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
-  const g=ctx.createLinearGradient(gx,0,gx+gw,0);
-  g.addColorStop(0,"#25a8ff"); g.addColorStop(.45,"#3fd6ff"); g.addColorStop(.78,"#f2c14e"); g.addColorStop(1,"#ff5a3c");
-  ctx.fillStyle=g; roundRectPath(ctx,gx+3,gy+3,(gw-6)*pw,gh-6,(gh-6)/2); ctx.fill();
-  // séparateurs de zone
-  ctx.strokeStyle="rgba(3,8,20,.5)"; ctx.lineWidth=2;
-  [.32,.62,.9].forEach(f=>{ ctx.beginPath(); ctx.moveTo(gx+gw*f,gy+2); ctx.lineTo(gx+gw*f,gy+gh-2); ctx.stroke(); });
-  ctx.restore();
-  const label=pw>.9?"PUISSANCE MAX !":pw>.62?"TIR PUISSANT":pw>.32?"TIR MOYEN":"TIR FAIBLE";
-  const labelCol=pw>.9?"#ff8a5c":pw>.62?"#f2c14e":pw>.32?"#3fd6ff":"#8fa3c8";
-  ctx.font=`900 ${pw>.9?15:13}px -apple-system,sans-serif`; ctx.fillStyle=labelCol;
-  ctx.textAlign="center"; ctx.fillText(label,W/2,gy-11);
+    const pos=currentPowerPos();
+    const inSweet=pos>=match.sweetLo&&pos<=match.sweetHi;
+    if(inSweet&&!match.wasInSweet)buzz(9);
+    match.wasInSweet=inSweet;
+
+    // jauge oscillante avec zone dorée à toucher
+    const gw=Math.min(240,W*.72), gx=W/2-gw/2, gy=H*.80, gh=24;
+    const pulse=inSweet?1+Math.sin(performance.now()/60)*.05:1;
+    ctx.save(); ctx.translate(W/2,gy+gh/2); ctx.scale(pulse,pulse); ctx.translate(-W/2,-(gy+gh/2));
+    ctx.fillStyle="rgba(8,16,36,.8)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
+    ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
+    roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
+    // dégradé de fond faible→fort
+    const bg=ctx.createLinearGradient(gx,0,gx+gw,0);
+    bg.addColorStop(0,"rgba(37,168,255,.35)"); bg.addColorStop(.7,"rgba(63,214,255,.4)"); bg.addColorStop(1,"rgba(255,90,60,.4)");
+    ctx.fillStyle=bg; roundRectPath(ctx,gx+3,gy+3,gw-6,gh-6,(gh-6)/2); ctx.fill();
+    // zone dorée (cible de puissance parfaite)
+    const sx=gx+gw*match.sweetLo, sw=gw*(match.sweetHi-match.sweetLo);
+    ctx.fillStyle=inSweet?"rgba(255,224,140,.95)":"rgba(242,193,78,.8)";
+    roundRectPath(ctx,sx,gy+2,sw,gh-4,4); ctx.fill();
+    if(inSweet){ ctx.strokeStyle="#fff4c2"; ctx.lineWidth=2; roundRectPath(ctx,sx-2,gy,sw+4,gh,6); ctx.stroke(); }
+    ctx.restore();
+    // curseur mobile
+    const cx=gx+gw*pos;
+    ctx.fillStyle="#ffffff"; ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(cx,gy-9); ctx.lineTo(cx-8,gy-1); ctx.lineTo(cx+8,gy-1); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    const label=inSweet?"ZONE PARFAITE — TOUCHE !":"TOUCHE L'ÉCRAN AU BON MOMENT";
+    ctx.font=`900 ${inSweet?15:13}px -apple-system,sans-serif`;
+    ctx.fillStyle=inSweet?"#fff4c2":"#8fa3c8";
+    ctx.textAlign="center"; ctx.fillText(label,W/2,gy-16);
+  }
 }
 
 /* ---------- MENU / NAVIGATION ---------- */
