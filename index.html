@@ -645,7 +645,7 @@ noise(dur,vol,freq){ if(!this.ctx)return;
   s.connect(f).connect(g).connect(this.master); s.start(); },
 ui(){this.tone(1400,.05,"sine",.05);},
 whistle(n){ let dl=0; for(let i=0;i<(n||1);i++){ setTimeout(()=>{this.tone(2350,.28,"square",.03);this.tone(2380,.28,"sine",.05);},dl); dl+=380; } },
-kick(p){ this.tone(95,.14,"sine",.32,38); this.noise(.05,.16,900); buzz(18+p*25); },
+kick(p){ this.tone(90-p*12,.1+p*.08,"sine",.24+p*.16,34-p*8); this.noise(.04+p*.05,.12+p*.16,850+p*250); buzz(12+p*45); },
 bounce(){ this.tone(70,.1,"sine",.2,40); },
 post(){ this.tone(640,.35,"square",.07,600); this.tone(1280,.45,"sine",.09,1180); buzz(35); },
 gloves(){ this.noise(.1,.2,600); this.tone(120,.1,"sine",.18,70); buzz(25); },
@@ -1557,22 +1557,25 @@ function startAIRun(){
 }
 
 /* — visée du joueur (drag) — */
-const drag={on:false,sx:0,sy:0,cx:0,cy:0};
+const drag={on:false,sx:0,sy:0,cx:0,cy:0,tick:0};
 canvas.addEventListener("pointerdown",e=>{
   if(state==="splash"){ return; }
   if(state!=="match"||match.phase!=="aim")return;
-  drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY;
+  drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY; drag.tick=0;
 });
 canvas.addEventListener("pointermove",e=>{
   if(!drag.on)return; drag.cx=e.clientX; drag.cy=e.clientY;
+  const pw=clamp(Math.hypot(drag.cx-drag.sx,drag.sy-drag.cy)/(H*.42),.16,1);
+  const stage=pw>.9?3:pw>.62?2:pw>.32?1:0;
+  if(stage>drag.tick){ drag.tick=stage; buzz(stage===3?[14,10,14]:10); }
 });
 window.addEventListener("pointerup",e=>{
   if(!drag.on)return; drag.on=false;
   if(state!=="match"||match.phase!=="aim")return;
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
   const len=Math.hypot(dx,dy);
-  if(len<26)return; // trop court = annulé
-  const power=clamp(len/(H*.42),.35,1);
+  if(len<22)return; // trop court = annulé
+  const power=clamp(len/(H*.42),.16,1);
   const t=dragTarget();
   // bruit de précision : plus fort = moins précis
   const err=.14+power*.55;
@@ -1681,16 +1684,16 @@ function launchBall(){
       kz:match.keeperZone,rands:match.kickRands,curve:match.kickCurve,mk:match.cup?match.cup.mk:null});
   }
   match.flight={tx:match.aim.x,ty:match.aim.y,pw,
-    dur:lerp(.95,.5,pw),
+    dur:lerp(1.15,.42,pw),
     curve:match.kickCurve!=null?match.kickCurve:rnd(-.35,.35)*(1-pw*.4),
     arc:match.aim.y>1.4?1:lerp(1.2,.5,pw)};
   match.phase="flight"; match.timer=0;
   shooter.kick=1;
-  ball.squash=.8;
+  ball.squash=.45+pw*.55; // un tir puissant écrase davantage le ballon à l'impact
   AU.kick(pw);
-  spawnParts(...Object.values(projPoint(0,0,0)),12,{sp:70,g:500,life:.5,sz:2.4,
+  spawnParts(...Object.values(projPoint(0,0,0)),Math.round(6+pw*16),{sp:60+pw*70,g:500,life:.5,sz:2+pw*1.5,
     cols:["#2c9a52","#1c6c3c","#6b4f2a"]});
-  if(!save.reduceMotion)shake(4+pw*5);
+  if(!save.reduceMotion)shake(2+pw*9);
   if(match.decisive)AU.crowdLevel(.015,.3);
 }
 function projPoint(x,y,z){const p=proj(x,y,z);return{x:p.x,y:p.y};}
@@ -1979,9 +1982,10 @@ function drawAimOverlay(){
   const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
   const b=proj(0,.11,0);
   const len=Math.hypot(drag.cx-drag.sx,drag.sy-drag.cy);
-  const pw=clamp(len/(H*.42),.35,1);
-  // courbe de visée
-  ctx.strokeStyle=`rgba(63,214,255,.65)`; ctx.lineWidth=3; ctx.setLineDash([7,9]);
+  const pw=clamp(len/(H*.42),.16,1);
+  // courbe de visée — plus la puissance monte, plus le trait s'épaissit et rougeoie
+  ctx.strokeStyle=pw>.85?"rgba(255,150,80,.8)":`rgba(63,214,255,.65)`;
+  ctx.lineWidth=2.5+pw*3; ctx.setLineDash([7,9]);
   ctx.beginPath(); ctx.moveTo(b.x,b.y);
   ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
   ctx.setLineDash([]);
@@ -1990,14 +1994,25 @@ function drawAimOverlay(){
   ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
   ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
   ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
-  // jauge de puissance
-  const gx=W/2-70,gy=H*.86;
-  ctx.fillStyle="rgba(8,16,36,.7)"; roundRectPath(ctx,gx,gy,140,12,6); ctx.fill();
-  const g=ctx.createLinearGradient(gx,0,gx+140,0);
-  g.addColorStop(0,"#25a8ff"); g.addColorStop(.7,"#3fd6ff"); g.addColorStop(1,"#f2c14e");
-  ctx.fillStyle=g; roundRectPath(ctx,gx+2,gy+2,(140-4)*pw,8,4); ctx.fill();
-  ctx.font="700 11px -apple-system,sans-serif"; ctx.fillStyle="rgba(200,220,250,.8)";
-  ctx.textAlign="center"; ctx.fillText("PUISSANCE",W/2,gy-7);
+
+  // jauge de puissance — grande, zones colorées, libellé qui change
+  const gw=Math.min(220,W*.68), gx=W/2-gw/2, gy=H*.80, gh=20;
+  const pulse=pw>.9?1+Math.sin(performance.now()/70)*.06:1;
+  ctx.save(); ctx.translate(W/2,gy+gh/2); ctx.scale(pulse,pulse); ctx.translate(-W/2,-(gy+gh/2));
+  ctx.fillStyle="rgba(8,16,36,.78)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
+  ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
+  roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
+  const g=ctx.createLinearGradient(gx,0,gx+gw,0);
+  g.addColorStop(0,"#25a8ff"); g.addColorStop(.45,"#3fd6ff"); g.addColorStop(.78,"#f2c14e"); g.addColorStop(1,"#ff5a3c");
+  ctx.fillStyle=g; roundRectPath(ctx,gx+3,gy+3,(gw-6)*pw,gh-6,(gh-6)/2); ctx.fill();
+  // séparateurs de zone
+  ctx.strokeStyle="rgba(3,8,20,.5)"; ctx.lineWidth=2;
+  [.32,.62,.9].forEach(f=>{ ctx.beginPath(); ctx.moveTo(gx+gw*f,gy+2); ctx.lineTo(gx+gw*f,gy+gh-2); ctx.stroke(); });
+  ctx.restore();
+  const label=pw>.9?"PUISSANCE MAX !":pw>.62?"TIR PUISSANT":pw>.32?"TIR MOYEN":"TIR FAIBLE";
+  const labelCol=pw>.9?"#ff8a5c":pw>.62?"#f2c14e":pw>.32?"#3fd6ff":"#8fa3c8";
+  ctx.font=`900 ${pw>.9?15:13}px -apple-system,sans-serif`; ctx.fillStyle=labelCol;
+  ctx.textAlign="center"; ctx.fillText(label,W/2,gy-11);
 }
 
 /* ---------- MENU / NAVIGATION ---------- */
