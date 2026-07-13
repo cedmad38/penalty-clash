@@ -106,7 +106,8 @@ h1.logo .l3::before,h1.logo .l3::after{content:"★";font-size:.7em;vertical-ali
 .sb-side{display:flex;align-items:center;gap:9px;padding:10px 14px;flex:1}
 .sb-side.right{flex-direction:row-reverse}
 .sb-flag{width:26px;height:18px;border-radius:3px;flex:none;box-shadow:0 1px 4px rgba(0,0,0,.6)}
-.sb-name{font-size:13px;font-weight:800;font-style:italic;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+.sb-name{font-size:13px;font-weight:800;font-style:italic;letter-spacing:.05em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw}
 .sb-score{display:flex;align-items:center;justify-content:center;min-width:64px;font-size:26px;font-weight:900;
   background:linear-gradient(180deg,rgba(37,168,255,.25),rgba(10,30,70,.4));
   border-left:1px solid var(--glass-edge);border-right:1px solid var(--glass-edge);
@@ -188,6 +189,35 @@ h1.logo .l3::before,h1.logo .l3::after{content:"★";font-size:.7em;vertical-ali
 .card .nm{font-size:14px;font-weight:800;font-style:italic;text-transform:uppercase;letter-spacing:.04em}
 .card .pr{font-size:12px;font-weight:700;color:var(--gold-2);display:flex;gap:6px;align-items:center}
 .card.locked{filter:saturate(.55) brightness(.75)}
+.tab-row{display:flex;gap:8px;width:min(380px,92vw);overflow-x:auto;padding:4px 2px 10px;pointer-events:auto}
+.tab-chip{flex:none;padding:9px 16px;border-radius:99px;font-size:12px;font-weight:800;font-style:italic;
+  text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;border:1px solid var(--glass-edge);
+  background:rgba(10,22,48,.55);color:var(--muted);cursor:pointer}
+.tab-chip.on{color:#fff;border-color:var(--cyan);
+  background:linear-gradient(160deg,rgba(37,120,220,.5),rgba(10,30,70,.7));box-shadow:0 0 14px rgba(63,214,255,.3)}
+.jersey-swatch{width:84px;height:84px;border-radius:16px;position:relative;overflow:hidden;
+  box-shadow:0 6px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.25)}
+.jersey-swatch .num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:30px;font-weight:900;text-shadow:0 2px 4px rgba(0,0,0,.5)}
+.card .lg{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+.cup-match{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+  padding:10px 14px;border-radius:12px;background:rgba(10,22,48,.5);border:1px solid rgba(120,180,255,.15)}
+.cup-match.mine{border-color:var(--gold);box-shadow:0 0 14px rgba(242,193,78,.3)}
+.cup-match.done{opacity:.65}
+.cup-match .side{flex:1;font-size:12px;font-weight:800;font-style:italic;text-transform:uppercase;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cup-match .side.right{text-align:right}
+.cup-match .sc{flex:none;padding:0 10px;font-size:15px;font-weight:900;color:var(--gold-2)}
+.cup-round-h{width:100%;margin-top:14px;font-size:12px;font-weight:800;letter-spacing:.14em;
+  color:var(--muted);text-transform:uppercase;text-align:center}
+.lobby-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
+  background:rgba(10,22,48,.5);border:1px solid rgba(120,180,255,.15)}
+.lobby-row .badge{width:32px;height:32px;border-radius:9px;flex:none;display:flex;align-items:center;
+  justify-content:center;font-size:14px;font-weight:900;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.lobby-row .info{flex:1;text-align:left;overflow:hidden}
+.lobby-row .info b{display:block;font-size:14px;font-style:italic;text-transform:uppercase;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lobby-row .info span{font-size:11px;color:var(--muted)}
 .setting-row{display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px 4px;
   border-bottom:1px solid rgba(120,180,255,.14);font-size:16px;font-weight:700}
 .seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--glass-edge)}
@@ -251,8 +281,10 @@ input.txt:focus{border-color:var(--cyan);box-shadow:0 0 14px rgba(63,214,255,.3)
       <button class="btn gold" id="b-duel">⚔ Duel vs IA</button>
       <button class="btn" id="b-2p">🤝 Duel à 2 <span class="sub">même téléphone ou à distance</span></button>
       <button class="btn" id="b-tournoi">🏆 Tournoi</button>
+      <button class="btn" id="b-competition">🌍 Compétition <span class="sub">jusqu'à 8 en ligne</span></button>
     </div>
     <div id="menu-foot">
+      <button class="btn ghost small" id="b-equipe">Équipe</button>
       <button class="btn ghost small" id="b-vestiaire">Vestiaire</button>
       <button class="btn ghost small" id="b-reglages">Réglages</button>
     </div>
@@ -322,6 +354,63 @@ input.txt:focus{border-color:var(--cyan);box-shadow:0 0 14px rgba(63,214,255,.3)
     </div>
   </div>
 
+  <!-- COMPÉTITION : choix -->
+  <div class="screen" id="cup-pick-ui">
+    <div class="panel-center glass">
+      <h2>Compétition</h2>
+      <p>Jusqu'à 8 joueurs en ligne, chacun sur son téléphone.<br>L'IA comble les places vides.</p>
+      <button class="btn gold" id="cup-world" style="width:100%">🌍 Coupe du Monde
+        <span class="sub">sélections nationales</span></button>
+      <button class="btn" id="cup-champions" style="width:100%">🏆 Ligue des Champions
+        <span class="sub">clubs européens</span></button>
+      <button class="btn ghost small" id="cup-pick-back" style="width:100%">Retour</button>
+    </div>
+  </div>
+
+  <!-- COMPÉTITION : salon -->
+  <div class="screen" id="cup-salon-ui">
+    <div class="panel-center glass">
+      <h2 id="cup-salon-title">Compétition</h2>
+      <input class="txt" id="cup-name" maxlength="12" placeholder="TON NOM">
+      <button class="btn gold" id="cup-create" style="width:100%">Créer un tournoi</button>
+      <div style="display:flex;gap:10px;width:100%">
+        <input class="txt" id="cup-code" maxlength="4" placeholder="CODE" style="flex:1">
+        <button class="btn" id="cup-join">Rejoindre</button>
+      </div>
+      <button class="btn ghost small" id="cup-salon-back" style="width:100%">Retour</button>
+    </div>
+  </div>
+
+  <!-- COMPÉTITION : salon d'attente -->
+  <div class="screen" id="cup-lobby-ui">
+    <div class="panel-center glass">
+      <h2>Salon <span id="lobby-code" style="color:var(--gold-2)"></span></h2>
+      <div id="lobby-players" style="width:100%;display:flex;flex-direction:column;gap:8px;max-height:38vh;overflow-y:auto"></div>
+      <p id="lobby-msg" style="color:var(--muted);font-size:13px;text-align:center"></p>
+      <button class="btn gold" id="lobby-start" style="width:100%">Lancer le tournoi</button>
+      <button class="btn ghost small" id="lobby-leave" style="width:100%">Quitter le salon</button>
+    </div>
+  </div>
+
+  <!-- COMPÉTITION : arbre du tournoi -->
+  <div class="screen" id="cup-bracket-ui">
+    <div class="top-title"><div class="back-btn glass" id="cup-leave">‹</div><h2 id="cup-bracket-title">Compétition</h2></div>
+    <div id="cup-turn-area" class="panel-center glass" style="margin:6px 0 10px;padding:16px 18px;gap:10px"></div>
+    <div id="cup-bracket-list" style="width:min(380px,92vw);display:flex;flex-direction:column;gap:6px;
+      overflow-y:auto;padding-bottom:calc(24px + var(--safe-bottom));pointer-events:auto"></div>
+  </div>
+
+  <!-- COMPÉTITION : élimination -->
+  <div class="screen" id="cup-elim-ui">
+    <div class="panel-center glass">
+      <h2>Éliminé</h2>
+      <div id="elim-score" style="font-size:36px;font-weight:900;color:var(--gold-2)">0 - 0</div>
+      <p>Ton parcours s'arrête ici, mais le tournoi continue sans toi.</p>
+      <button class="btn gold" id="elim-watch" style="width:100%">Regarder le tournoi</button>
+      <button class="btn ghost" id="elim-quit" style="width:100%">Quitter</button>
+    </div>
+  </div>
+
   <!-- PASSE LE TÉLÉPHONE -->
   <div class="screen" id="pass-ui">
     <div class="panel-center glass">
@@ -340,6 +429,13 @@ input.txt:focus{border-color:var(--cyan);box-shadow:0 0 14px rgba(63,214,255,.3)
       <button class="btn ghost" id="r-menu">Menu</button>
       <button class="btn gold" id="r-again">Rejouer</button>
     </div>
+  </div>
+
+  <!-- ÉQUIPE -->
+  <div class="screen" id="equipe-ui">
+    <div class="top-title"><div class="back-btn glass" data-back>‹</div><h2>Équipe</h2></div>
+    <div class="tab-row" id="equipe-tabs"></div>
+    <div class="cards" id="equipe-cards"></div>
   </div>
 
   <!-- VESTIAIRE -->
@@ -390,7 +486,7 @@ let W=0,H=0,DPR=1;
 
 /* ---------- SAUVEGARDE ---------- */
 const DEFAULT_SAVE={coins:0,xp:0,balls:["classique"],ball:"classique",stadium:"classique",
-  sound:1,reduceMotion:0,gfx:"auto",tourStage:0,wins:0,played:0};
+  sound:1,reduceMotion:0,gfx:"auto",tourStage:0,wins:0,played:0,team:"fra",playerName:""};
 let save={};
 try{save=Object.assign({},DEFAULT_SAVE,JSON.parse(localStorage.getItem("pc_save")||"{}"));}
 catch(e){save=Object.assign({},DEFAULT_SAVE);}
@@ -413,7 +509,7 @@ const NET={
   members:{},                     // présence : clé -> {name, host}
   onPeers:null,onEvent:null,onDrop:null,
   nextRef(){return String(++this.ref);},
-  connect(code,isHost,name,cb){
+  connect(code,isHost,name,cb,extra){
     this.leave();
     this.myKey=Math.random().toString(36).slice(2,10);
     this.role=isHost?"A":"B";
@@ -441,7 +537,8 @@ const NET={
         if(m.payload&&m.payload.status==="ok"){ this.joined=true;
           // signaler ma présence (nom + rôle)
           ws.send(JSON.stringify({topic:this.topic,event:"presence",ref:this.nextRef(),
-            payload:{type:"presence",event:"track",payload:{name,host:isHost}}}));
+            payload:{type:"presence",event:"track",
+              payload:Object.assign({name,host:isHost,team:save.team},extra||{})}}));
           cb&&cb(true);
         } else cb&&cb(false);
       }
@@ -928,6 +1025,115 @@ const KIT_GK_P={jersey:"#c8951d",shorts:"#171207",socks:"#c8951d",number:"#0d1a3
 const KIT_GK_AI={jersey:"#0f8f6d",shorts:"#07211a",socks:"#0f8f6d",number:"#fff",num:"1",
   skin:"#b98a5e",hair:"#161009",gloves:"#dfe8e2"};
 
+/* ---------- ÉQUIPES (clubs des 5 grands championnats + sélections nationales) ---------- */
+const LEAGUES=[{id:"ligue1",label:"Ligue 1"},{id:"pl",label:"Premier League"},
+  {id:"liga",label:"Liga"},{id:"bund",label:"Bundesliga"},{id:"seriea",label:"Serie A"}];
+const TEAMS={
+ /* Ligue 1 */
+ psg:{name:"Paris SG",type:"club",league:"ligue1",c1:"#1c2c5b",c2:"#c8102e",num:"7"},
+ om:{name:"Marseille",type:"club",league:"ligue1",c1:"#2596e1",c2:"#ffffff",num:"10"},
+ ol:{name:"Lyon",type:"club",league:"ligue1",c1:"#1c3f94",c2:"#ffffff",num:"9"},
+ monaco:{name:"Monaco",type:"club",league:"ligue1",c1:"#e2001a",c2:"#ffffff",num:"17"},
+ lille:{name:"Lille",type:"club",league:"ligue1",c1:"#d0021b",c2:"#ffffff",num:"9"},
+ rennes:{name:"Rennes",type:"club",league:"ligue1",c1:"#e2001a",c2:"#0a0a0a",num:"10"},
+ nice:{name:"Nice",type:"club",league:"ligue1",c1:"#e2001a",c2:"#0a0a0a",num:"9"},
+ lens:{name:"Lens",type:"club",league:"ligue1",c1:"#f0b90b",c2:"#c8102e",num:"10"},
+ /* Premier League */
+ manu:{name:"Manchester United",type:"club",league:"pl",c1:"#da291c",c2:"#000000",num:"7"},
+ mancity:{name:"Manchester City",type:"club",league:"pl",c1:"#6cabdd",c2:"#1c2c5b",num:"17"},
+ liverpool:{name:"Liverpool",type:"club",league:"pl",c1:"#c8102e",c2:"#00285e",num:"11"},
+ chelsea:{name:"Chelsea",type:"club",league:"pl",c1:"#034694",c2:"#ffffff",num:"10"},
+ arsenal:{name:"Arsenal",type:"club",league:"pl",c1:"#ef0107",c2:"#063672",num:"9"},
+ tottenham:{name:"Tottenham",type:"club",league:"pl",c1:"#ffffff",c2:"#132257",num:"10"},
+ newcastle:{name:"Newcastle",type:"club",league:"pl",c1:"#241f20",c2:"#ffffff",num:"9"},
+ villa:{name:"Aston Villa",type:"club",league:"pl",c1:"#670e36",c2:"#95bfe5",num:"7"},
+ /* Liga */
+ real:{name:"Real Madrid",type:"club",league:"liga",c1:"#ffffff",c2:"#febe10",num:"9"},
+ barca:{name:"Barcelone",type:"club",league:"liga",c1:"#a50044",c2:"#004d98",num:"10"},
+ atletico:{name:"Atlético Madrid",type:"club",league:"liga",c1:"#cb3524",c2:"#272e61",num:"7"},
+ sevilla:{name:"Séville",type:"club",league:"liga",c1:"#ffffff",c2:"#d2001c",num:"9"},
+ realsociedad:{name:"Real Sociedad",type:"club",league:"liga",c1:"#0067b1",c2:"#ffffff",num:"10"},
+ bilbao:{name:"Athletic Bilbao",type:"club",league:"liga",c1:"#ee2523",c2:"#ffffff",num:"9"},
+ valencia:{name:"Valence",type:"club",league:"liga",c1:"#ffffff",c2:"#000000",num:"10"},
+ betis:{name:"Real Betis",type:"club",league:"liga",c1:"#00954c",c2:"#ffffff",num:"10"},
+ /* Bundesliga */
+ bayern:{name:"Bayern Munich",type:"club",league:"bund",c1:"#dc052d",c2:"#0066b2",num:"9"},
+ dortmund:{name:"Dortmund",type:"club",league:"bund",c1:"#fde100",c2:"#000000",num:"11"},
+ leipzig:{name:"RB Leipzig",type:"club",league:"bund",c1:"#ffffff",c2:"#dd0741",num:"9"},
+ leverkusen:{name:"Leverkusen",type:"club",league:"bund",c1:"#e32221",c2:"#000000",num:"7"},
+ gladbach:{name:"M'Gladbach",type:"club",league:"bund",c1:"#ffffff",c2:"#000000",num:"10"},
+ frankfurt:{name:"Francfort",type:"club",league:"bund",c1:"#000000",c2:"#e1000f",num:"9"},
+ wolfsburg:{name:"Wolfsburg",type:"club",league:"bund",c1:"#65b32e",c2:"#ffffff",num:"7"},
+ unionberlin:{name:"Union Berlin",type:"club",league:"bund",c1:"#eb1923",c2:"#ffffff",num:"10"},
+ /* Serie A */
+ juventus:{name:"Juventus",type:"club",league:"seriea",c1:"#000000",c2:"#ffffff",num:"10"},
+ inter:{name:"Inter Milan",type:"club",league:"seriea",c1:"#0068a8",c2:"#000000",num:"9"},
+ milan:{name:"AC Milan",type:"club",league:"seriea",c1:"#fb090b",c2:"#000000",num:"7"},
+ napoli:{name:"Naples",type:"club",league:"seriea",c1:"#12a0d7",c2:"#ffffff",num:"10"},
+ roma:{name:"AS Roma",type:"club",league:"seriea",c1:"#8e1f2f",c2:"#f0bc42",num:"9"},
+ atalanta:{name:"Atalanta",type:"club",league:"seriea",c1:"#1e71b8",c2:"#000000",num:"10"},
+ lazio:{name:"Lazio",type:"club",league:"seriea",c1:"#87d8f7",c2:"#ffffff",num:"17"},
+ fiorentina:{name:"Fiorentina",type:"club",league:"seriea",c1:"#5e2e8c",c2:"#ffffff",num:"9"},
+ /* Sélections nationales */
+ fra:{name:"France",type:"nation",c1:"#0055a4",c2:"#ffffff",num:"10"},
+ bra:{name:"Brésil",type:"nation",c1:"#ffdf00",c2:"#009739",num:"9"},
+ arg:{name:"Argentine",type:"nation",c1:"#75aadb",c2:"#ffffff",num:"10"},
+ ger:{name:"Allemagne",type:"nation",c1:"#ffffff",c2:"#000000",num:"9"},
+ esp:{name:"Espagne",type:"nation",c1:"#c60b1e",c2:"#ffc400",num:"9"},
+ eng:{name:"Angleterre",type:"nation",c1:"#ffffff",c2:"#1e2a5e",num:"9"},
+ ita:{name:"Italie",type:"nation",c1:"#00529f",c2:"#ffffff",num:"9"},
+ por:{name:"Portugal",type:"nation",c1:"#c8102e",c2:"#046a38",num:"7"},
+ bel:{name:"Belgique",type:"nation",c1:"#da121a",c2:"#000000",num:"7"},
+ ned:{name:"Pays-Bas",type:"nation",c1:"#ff6c00",c2:"#ffffff",num:"10"},
+ mar:{name:"Maroc",type:"nation",c1:"#c1272d",c2:"#006233",num:"9"},
+ cro:{name:"Croatie",type:"nation",c1:"#ff0000",c2:"#ffffff",num:"10"},
+ uru:{name:"Uruguay",type:"nation",c1:"#7daae0",c2:"#ffffff",num:"9"},
+ col:{name:"Colombie",type:"nation",c1:"#fcd116",c2:"#003893",num:"10"},
+ sen:{name:"Sénégal",type:"nation",c1:"#00853f",c2:"#fdef42",num:"10"},
+ jpn:{name:"Japon",type:"nation",c1:"#0033a0",c2:"#ffffff",num:"10"},
+ kor:{name:"Corée du Sud",type:"nation",c1:"#c60c30",c2:"#ffffff",num:"7"},
+ usa:{name:"États-Unis",type:"nation",c1:"#b31942",c2:"#0a3161",num:"9"},
+ mex:{name:"Mexique",type:"nation",c1:"#00693e",c2:"#ffffff",num:"10"},
+ sui:{name:"Suisse",type:"nation",c1:"#da291c",c2:"#ffffff",num:"10"},
+ pol:{name:"Pologne",type:"nation",c1:"#ffffff",c2:"#dc143c",num:"9"},
+ den:{name:"Danemark",type:"nation",c1:"#c60c30",c2:"#ffffff",num:"10"},
+ swe:{name:"Suède",type:"nation",c1:"#fecc02",c2:"#004b87",num:"9"},
+ srb:{name:"Serbie",type:"nation",c1:"#c6363c",c2:"#0c4076",num:"9"},
+ gha:{name:"Ghana",type:"nation",c1:"#000000",c2:"#ce1126",num:"10"},
+ nga:{name:"Nigéria",type:"nation",c1:"#008751",c2:"#ffffff",num:"10"},
+ civ:{name:"Côte d'Ivoire",type:"nation",c1:"#ff8200",c2:"#ffffff",num:"9"},
+ alg:{name:"Algérie",type:"nation",c1:"#006233",c2:"#ffffff",num:"10"},
+ tun:{name:"Tunisie",type:"nation",c1:"#e70013",c2:"#ffffff",num:"10"},
+ wal:{name:"Pays de Galles",type:"nation",c1:"#c8102e",c2:"#ffffff",num:"11"}
+};
+const SKIN_TONES=["#c9976b","#8a5f3c","#e8c39e","#5b3a22","#d8a878","#734a2f"];
+const HAIR_TONES=["#1b1410","#0d0a08","#3b2415","#050505","#241a12"];
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
+function pickSkinHair(seed){const h=hashStr(seed);
+  return{skin:SKIN_TONES[h%SKIN_TONES.length],hair:HAIR_TONES[(h>>3)%HAIR_TONES.length]};}
+function isLight(hex){const n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  return (0.299*r+0.587*g+0.114*b)>150;}
+function buildKit(id){
+  const t=TEAMS[id]||TEAMS.fra; const sh=pickSkinHair(id);
+  const numberColor=isLight(t.c1)?"#12213f":"#f2c14e";
+  const shortsColor=t.c2==="#ffffff"?"#12213f":shade(t.c2,-0.15);
+  return{jersey:t.c1,shorts:shortsColor,socks:t.c1,number:numberColor,num:t.num,
+    skin:sh.skin,hair:sh.hair,gloves:null};
+}
+function buildKitFromFlag(colors,num,seed){
+  const c1=colors[0],c2=colors[1]; const sh=pickSkinHair(seed||"x");
+  const numberColor=isLight(c1)?"#12213f":"#f2c14e";
+  const shortsColor=c2==="#ffffff"?"#12213f":shade(c2,-0.15);
+  return{jersey:c1,shorts:shortsColor,socks:c1,number:numberColor,num:String(num),
+    skin:sh.skin,hair:sh.hair,gloves:null};
+}
+function pickRandomTeam(excludeId){
+  // un club affronte un club, une sélection affronte une sélection
+  const myType=(TEAMS[excludeId]||TEAMS.fra).type;
+  const ids=Object.keys(TEAMS).filter(k=>k!==excludeId&&TEAMS[k].type===myType);
+  return ids[Math.floor(Math.random()*ids.length)];
+}
+
 /* ---------- PARTICULES ---------- */
 const parts=[];
 function spawnParts(x,y,n,cfg){
@@ -1120,18 +1326,53 @@ const TOUR_STEPS=[
 
 function startMatch(mode,opts){
   opts=opts||{};
+  // équipes et maillots : varient selon le mode pour ne jamais rejouer "le même joueur"
+  let kitA,kitB,flagA,flagB,nameA,nameB;
+  if(mode==="online"){
+    const meTeam=save.team;
+    let peerTeam="fra";
+    for(const k in NET.members)if(k!==NET.myKey)peerTeam=NET.members[k].team||"fra";
+    const teamA=NET.role==="A"?meTeam:peerTeam, teamB=NET.role==="A"?peerTeam:meTeam;
+    kitA=buildKit(teamA); kitB=buildKit(teamB);
+    flagA=[TEAMS[teamA].c1,TEAMS[teamA].c2]; flagB=[TEAMS[teamB].c1,TEAMS[teamB].c2];
+    nameA=(opts.names&&opts.names[0])||"JOUEUR 1"; nameB=(opts.names&&opts.names[1])||"JOUEUR 2";
+  } else if(mode==="2p"){
+    const teamA=save.team, teamB=pickRandomTeam(teamA);
+    kitA=buildKit(teamA); kitB=buildKit(teamB);
+    flagA=[TEAMS[teamA].c1,TEAMS[teamA].c2]; flagB=[TEAMS[teamB].c1,TEAMS[teamB].c2];
+    nameA="JOUEUR 1"; nameB="JOUEUR 2";
+  } else if(mode==="tournoi"){
+    const teamA=save.team;
+    kitA=buildKit(teamA); flagA=[TEAMS[teamA].c1,TEAMS[teamA].c2];
+    flagB=opts.flag||["#8f1626","#fff"];
+    kitB=buildKitFromFlag(flagB,8+((opts.tourRound??0)+1),"tour"+(opts.tourRound??0));
+    nameA=TEAMS[teamA].name; nameB=opts.oppName||"IA UNITED";
+  } else { // "ia"
+    const teamA=save.team, teamB=pickRandomTeam(teamA);
+    kitA=buildKit(teamA); kitB=buildKit(teamB);
+    flagA=[TEAMS[teamA].c1,TEAMS[teamA].c2]; flagB=[TEAMS[teamB].c1,TEAMS[teamB].c2];
+    nameA=TEAMS[teamA].name; nameB=TEAMS[teamB].name;
+  }
+  // matchs de Compétition (Coupe du Monde / Ligue des Champions) : équipes imposées par le bracket
+  if(opts.cupTeams){
+    kitA=buildKit(opts.cupTeams.a); kitB=buildKit(opts.cupTeams.b);
+    flagA=[TEAMS[opts.cupTeams.a].c1,TEAMS[opts.cupTeams.a].c2];
+    flagB=[TEAMS[opts.cupTeams.b].c1,TEAMS[opts.cupTeams.b].c2];
+    nameA=(opts.cupNames&&opts.cupNames[0])||TEAMS[opts.cupTeams.a].name;
+    nameB=(opts.cupNames&&opts.cupNames[1])||TEAMS[opts.cupTeams.b].name;
+  }
   Object.assign(match,{mode,phase:"intro",shotIdx:0,sudden:false,scoreA:0,scoreB:0,
     dotsA:[],dotsB:[],turn:"A",aim:null,keeperZone:null,playerZone:null,timer:0,outcome:null,
     decisive:false,tourRound:opts.tourRound??-1,autoKeeper:!!opts.autoKeeper,
     difficulty:opts.difficulty??.45,kickIdx:0,pendingZones:{},pendingKicks:{},
-    names:opts.names||[mode==="2p"?"JOUEUR 1":"CEDMAD", mode==="2p"?"JOUEUR 2":(opts.oppName||"IA UNITED")]});
-  match.oppFlag=opts.flag||["#8f1626","#fff"];
+    kits:[kitA,kitB],names:[nameA,nameB],cup:opts.cup||null});
+  match.oppFlag=flagB;
   resetBall(); initNet(); parts.length=0;
   shooter.visible=false; gk.dive=null; gk.diveT=0;
   buildDots();
   updateScoreUI();
-  $("#flag-a").style.background=`linear-gradient(135deg,#16408f 55%,#f2c14e 55%)`;
-  $("#flag-b").style.background=`linear-gradient(135deg,${match.oppFlag[0]} 55%,${match.oppFlag[1]} 55%)`;
+  $("#flag-a").style.background=`linear-gradient(135deg,${flagA[0]} 55%,${flagA[1]} 55%)`;
+  $("#flag-b").style.background=`linear-gradient(135deg,${flagB[0]} 55%,${flagB[1]} 55%)`;
   $("#name-a").textContent=match.names[0]; $("#name-b").textContent=match.names[1];
   showScreen("hud");
   state="match";
@@ -1231,7 +1472,7 @@ function beginOnlineKeep(){
   banner("ARRÊTE CE TIR !","blue-t");
   hint("Choisis ta zone AVANT que "+(match.turn==="A"?match.names[0]:match.names[1])+" ne frappe !");
   showZoneGrid(false,z=>{ hideZoneGrid(); hint("Zone choisie — il arme sa frappe…");
-    NET.send("zone",{k:match.kickIdx,z}); });
+    NET.send("zone",{k:match.kickIdx,z,mk:match.cup?match.cup.mk:null}); });
   // si le tir adverse est déjà arrivé (téléphone plus lent), le jouer maintenant
   const pk=match.pendingKicks&&match.pendingKicks[match.kickIdx];
   if(pk)applyRemoteKick(pk);
@@ -1416,7 +1657,7 @@ function launchBall(){
     match.kickRands={save:Math.random(),caught:Math.random(),postIn:Math.random()};
     match.kickCurve=rnd(-.35,.35)*(1-pw*.4);
     NET.send("kick",{k:match.kickIdx,aim:match.aim,power:match.power,
-      kz:match.keeperZone,rands:match.kickRands,curve:match.kickCurve});
+      kz:match.keeperZone,rands:match.kickRands,curve:match.kickCurve,mk:match.cup?match.cup.mk:null});
   }
   match.flight={tx:match.aim.x,ty:match.aim.y,pw,
     dur:lerp(.95,.5,pw),
@@ -1530,6 +1771,7 @@ function finishKick(){
   nextKick();
 }
 function endMatch(){
+  if(match.cup){ finishCupMatch(); return; }
   match.phase="idle";
   $("#vignette").classList.remove("show");
   AU.heartbeat(false);
@@ -1663,7 +1905,8 @@ function stepShake(dt){
 /* ============================================================
    UI — écrans, navigation
 ============================================================ */
-const screens=["splash-ui","menu-ui","hud","mode-ui","duo-ui","online-ui","pass-ui","result-ui","vestiaire-ui","reglages-ui","tournoi-ui"];
+const screens=["splash-ui","menu-ui","hud","mode-ui","duo-ui","online-ui","pass-ui","result-ui","equipe-ui",
+  "vestiaire-ui","reglages-ui","tournoi-ui","cup-pick-ui","cup-salon-ui","cup-lobby-ui","cup-bracket-ui","cup-elim-ui"];
 function showScreen(id){
   screens.forEach(s=>$("#"+s).classList.toggle("on",s===id));
 }
@@ -1817,17 +2060,25 @@ function openSalon(code,isHost){
     }
   };
   NET.onEvent=(ev,p)=>{
-    if(ev==="zone"&&p){ match.pendingZones[p.k]=p.z;
-      if(p.k===match.kickIdx&&match.phase==="waitzone"&&match.turn===NET.role){
-        clearTimeout(match.waitTimer); beginAim(); } }
-    else if(ev==="kick"&&p){
-      match.pendingKicks[p.k]=p;
-      if(p.k===match.kickIdx&&match.phase==="guess")applyRemoteKick(p);
-    }
-    else if(ev==="rematch"){ rematch.remote=true; tryRematch(); }
+    if(ev==="rematch"){ rematch.remote=true; tryRematch(); }
+    else applyMatchEvent(ev,p);
   };
   NET.onDrop=()=>{ if(state==="match"&&match.mode==="online")onOpponentLeft();
     else { banner("CONNEXION PERDUE","blue-t"); $("#online-cancel").click(); } };
+}
+/* gestion partagée des messages "zone"/"kick" pendant un tir (duel à 2 ET matchs de compétition) */
+function applyMatchEvent(ev,p){
+  if(ev==="zone"&&p){
+    if((p.mk||null)!==(match.cup?match.cup.mk:null))return; // pas mon match en cours
+    match.pendingZones[p.k]=p.z;
+    if(p.k===match.kickIdx&&match.phase==="waitzone"&&match.turn===NET.role){
+      clearTimeout(match.waitTimer); beginAim(); }
+  }
+  else if(ev==="kick"&&p){
+    if((p.mk||null)!==(match.cup?match.cup.mk:null))return;
+    match.pendingKicks[p.k]=p;
+    if(p.k===match.kickIdx&&match.phase==="guess")applyRemoteKick(p);
+  }
 }
 function startOnlineMatch(names){
   rematch.local=rematch.remote=false;
@@ -1835,6 +2086,17 @@ function startOnlineMatch(names){
   $("#flag-b").style.background=`linear-gradient(135deg,#0f8f6d 55%,#fff 55%)`;
 }
 function onOpponentLeft(){
+  if(match.mode==="online"&&match.cup){
+    // en compétition : on ne quitte pas le salon, victoire par forfait et on continue le tournoi
+    banner("ADVERSAIRE DÉCONNECTÉ — FORFAIT","gold-t");
+    const mySlot=CUP.mySlot, m=CUP.bracket.rounds[match.cup.round][match.cup.matchIdx];
+    const iAmA=m.a===mySlot;
+    if(iAmA)match.scoreA=Math.max(match.scoreA,match.scoreB+1);
+    else match.scoreB=Math.max(match.scoreB,match.scoreA+1);
+    match.phase="idle";
+    setTimeout(()=>finishCupMatch(),1400);
+    return;
+  }
   banner("ADVERSAIRE DÉCONNECTÉ","blue-t");
   AU.aww();
   setTimeout(()=>{ NET.leave(); toMenu(); },1800);
@@ -1856,7 +2118,260 @@ $("#online-join").onclick=()=>{AU.ui();
   const code=($("#online-code").value||"").trim().toUpperCase();
   if(code.length!==4){ $("#online-code").focus(); return; }
   openSalon(code,false);};
+
+/* ============================================================
+   COMPÉTITION — Coupe du Monde / Ligue des Champions
+   Jusqu'à 8 joueurs en ligne (salon à code), l'IA comble les places
+   vides, arbre Quart → Demi → Finale qui progresse tout seul sur
+   chaque téléphone (aucun serveur : tout circule par diffusion).
+============================================================ */
+const CUP={competition:null,isHost:false,slots:null,bracket:null,mySlot:null,
+  eliminated:false,champion:null,champWasShown:false,startedMk:null,
+  pendingMk:null,pendingInfo:null,joinTimer:null};
+function pickTeamOfType(type,exclude){
+  exclude=exclude||[];
+  const ids=Object.keys(TEAMS).filter(k=>TEAMS[k].type===type&&exclude.indexOf(k)===-1);
+  const pool=ids.length?ids:Object.keys(TEAMS).filter(k=>TEAMS[k].type===type);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function shuffleArray(a){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+function myCupName(){
+  let n=($("#cup-name").value||"").trim().toUpperCase().slice(0,12);
+  if(!n)n="JOUEUR "+Math.floor(rnd(10,99));
+  save.playerName=n; persist(); return n;
+}
+$("#b-competition").onclick=()=>{AU.ui();showScreen("cup-pick-ui");};
+$("#cup-pick-back").onclick=()=>{AU.ui();showScreen("menu-ui");};
+$("#cup-world").onclick=()=>{AU.ui();CUP.competition="monde";
+  $("#cup-salon-title").textContent="Coupe du Monde"; $("#cup-name").value=save.playerName||"";
+  showScreen("cup-salon-ui");};
+$("#cup-champions").onclick=()=>{AU.ui();CUP.competition="ligue";
+  $("#cup-salon-title").textContent="Ligue des Champions"; $("#cup-name").value=save.playerName||"";
+  showScreen("cup-salon-ui");};
+$("#cup-salon-back").onclick=()=>{AU.ui();showScreen("cup-pick-ui");};
+$("#cup-create").onclick=()=>{AU.ui();
+  let code=""; for(let i=0;i<4;i++)code+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];
+  $("#lobby-code").textContent=code; openCupSalon(code,true);};
+$("#cup-join").onclick=()=>{AU.ui();
+  const code=($("#cup-code").value||"").trim().toUpperCase();
+  if(code.length!==4){ $("#cup-code").focus(); return; }
+  $("#lobby-code").textContent=code; openCupSalon(code,false);};
+$("#lobby-start").onclick=()=>{AU.ui();hostLaunchCup();};
+$("#lobby-leave").onclick=()=>{AU.ui();NET.leave();showScreen("menu-ui");};
+$("#cup-leave").onclick=()=>{AU.ui();NET.leave();toMenu();};
+$("#elim-watch").onclick=()=>{AU.ui();showScreen("cup-bracket-ui");renderCupBracket();};
+$("#elim-quit").onclick=()=>{AU.ui();NET.leave();toMenu();};
+
+function openCupSalon(code,isHost){
+  CUP.isHost=isHost; CUP.bracket=null; CUP.champion=null; CUP.champWasShown=false;
+  CUP.mySlot=null; CUP.eliminated=false; CUP.startedMk=null; CUP.pendingMk=null;
+  const name=myCupName();
+  const wantType=CUP.competition==="monde"?"nation":"club";
+  const cteam=(TEAMS[save.team]&&TEAMS[save.team].type===wantType)?save.team:pickTeamOfType(wantType);
+  showScreen("cup-lobby-ui");
+  $("#lobby-players").innerHTML=""; $("#lobby-msg").textContent="Connexion…";
+  NET.connect("CUP"+code,isHost,name,ok=>{
+    if(!ok){ banner("CONNEXION IMPOSSIBLE","blue-t"); NET.leave(); showScreen("cup-salon-ui"); return; }
+  },{cteam});
+  NET.onPeers=()=>{
+    if(!CUP.bracket){ renderLobby(); return; }
+    if(state==="match"&&match.mode==="online"&&match.cup){
+      const m=CUP.bracket.rounds[match.cup.round][match.cup.matchIdx];
+      const oppSlot=m.a===CUP.mySlot?m.b:m.a;
+      const oppKey=CUP.slots[oppSlot]&&CUP.slots[oppSlot].key;
+      if(oppKey&&!NET.members[oppKey])onOpponentLeft();
+    }
+  };
+  NET.onEvent=(ev,p)=>{
+    if(ev==="cupStart"&&p){ applyCupStart(p.slots,p.bracket); }
+    else if(ev==="cupResult"&&p){ applyCupResult(p.round,p.matchIdx,p.scoreA,p.scoreB);
+      if(state!=="match")renderCupBracket(); }
+    else if(ev==="cupJoin"&&p){ if(CUP.pendingMk&&p.mk===CUP.pendingMk)launchCupPairing(); }
+    else applyMatchEvent(ev,p);
+  };
+  NET.onDrop=()=>{ banner("CONNEXION PERDUE","blue-t"); setTimeout(()=>{ NET.leave(); toMenu(); },1500); };
+}
+function renderLobby(){
+  const wrap=$("#lobby-players"); wrap.innerHTML="";
+  const entries=Object.entries(NET.members);
+  entries.forEach(([k,v])=>{
+    const t=TEAMS[v.cteam]||TEAMS.fra;
+    const row=document.createElement("div");
+    row.className="lobby-row";
+    row.innerHTML=`<div class="badge" style="background:linear-gradient(115deg,${t.c1} 58%,${t.c2} 58%);
+        color:${isLight(t.c1)?"#12213f":"#f2c14e"}">${t.num}</div>
+      <div class="info"><b>${v.name}${v.host?" · HÔTE":""}</b><span>${t.name}</span></div>`;
+    wrap.appendChild(row);
+  });
+  const n=entries.length;
+  $("#lobby-msg").textContent=(n<8
+    ?`${n} joueur${n>1?"s":""} connecté${n>1?"s":""} — les ${8-n} places restantes seront comblées par l'IA.`
+    :"Salon complet (8 joueurs) !")+(CUP.isHost?"":" En attente que l'hôte lance le tournoi.");
+  $("#lobby-start").style.display=CUP.isHost?"block":"none";
+}
+function hostLaunchCup(){
+  const wantType=CUP.competition==="monde"?"nation":"club";
+  const slots=Object.entries(NET.members).map(([k,v])=>(
+    {key:k,name:v.name,team:v.cteam||pickTeamOfType(wantType),isAI:false}));
+  shuffleArray(slots);
+  const usedTeams=slots.map(s=>s.team);
+  let aiN=0;
+  while(slots.length<8){
+    aiN++;
+    const t=pickTeamOfType(wantType,usedTeams);
+    usedTeams.push(t);
+    slots.push({key:"ai"+aiN,name:"IA "+aiN,team:t,isAI:true});
+  }
+  const bracket={rounds:[[],[
+    {a:null,b:null,played:false,scoreA:0,scoreB:0,winner:null},
+    {a:null,b:null,played:false,scoreA:0,scoreB:0,winner:null}],
+    [{a:null,b:null,played:false,scoreA:0,scoreB:0,winner:null}]]};
+  for(let i=0;i<4;i++)bracket.rounds[0].push({a:2*i,b:2*i+1,played:false,scoreA:0,scoreB:0,winner:null});
+  NET.send("cupStart",{slots,bracket});
+  applyCupStart(slots,bracket);
+}
+function applyCupStart(slots,bracket){
+  CUP.slots=slots; CUP.bracket=bracket; CUP.champion=null; CUP.champWasShown=false; CUP.eliminated=false;
+  CUP.mySlot=slots.findIndex(s=>s.key===NET.myKey);
+  $("#cup-bracket-title").textContent=CUP.competition==="monde"?"Coupe du Monde":"Ligue des Champions";
+  showScreen("cup-bracket-ui");
+  renderCupBracket();
+}
+function applyCupResult(round,matchIdx,scoreA,scoreB){
+  if(!CUP.bracket)return;
+  const m=CUP.bracket.rounds[round][matchIdx];
+  if(!m||m.played)return; // idempotent : premier résultat reçu qui compte
+  m.played=true; m.scoreA=scoreA; m.scoreB=scoreB;
+  m.winner=scoreA>scoreB?m.a:m.b;
+  if(round<CUP.bracket.rounds.length-1){
+    const nextIdx=Math.floor(matchIdx/2), next=CUP.bracket.rounds[round+1][nextIdx];
+    if(matchIdx%2===0)next.a=m.winner; else next.b=m.winner;
+  } else CUP.champion=m.winner;
+}
+function findMyPendingMatch(){
+  if(!CUP.bracket||CUP.mySlot==null)return null;
+  for(let r=0;r<CUP.bracket.rounds.length;r++)
+    for(let i=0;i<CUP.bracket.rounds[r].length;i++){
+      const m=CUP.bracket.rounds[r][i];
+      if(!m.played&&m.a!=null&&m.b!=null&&(m.a===CUP.mySlot||m.b===CUP.mySlot))
+        return {round:r,matchIdx:i,m};
+    }
+  return null;
+}
+function checkMyCupTurn(){
+  if(CUP.eliminated||CUP.mySlot==null)return;
+  const p=findMyPendingMatch();
+  if(!p)return;
+  const mk="r"+p.round+"m"+p.matchIdx;
+  if(CUP.startedMk===mk)return;
+  CUP.startedMk=mk;
+  const oppIdx=p.m.a===CUP.mySlot?p.m.b:p.m.a;
+  const opp=CUP.slots[oppIdx];
+  const roundDiff=[0.4,0.55,0.7][p.round]||0.5;
+  if(opp.isAI){
+    startMatch("ia",{autoKeeper:false,difficulty:roundDiff,
+      cupTeams:{a:CUP.slots[p.m.a].team,b:CUP.slots[p.m.b].team},
+      cupNames:[CUP.slots[p.m.a].name,CUP.slots[p.m.b].name],
+      cup:{round:p.round,matchIdx:p.matchIdx,mk}});
+  } else {
+    $("#cup-turn-area").innerHTML=`<div style="text-align:center;display:flex;flex-direction:column;
+      align-items:center;gap:10px"><div class="spin"></div>
+      <p style="color:var(--muted);font-size:14px">En attente de ${opp.name}…</p></div>`;
+    enterCupHumanMatch(mk,p.round,p.matchIdx);
+  }
+}
+function enterCupHumanMatch(mk,round,matchIdx){
+  CUP.pendingMk=mk; CUP.pendingInfo={round,matchIdx};
+  clearInterval(CUP.joinTimer);
+  NET.send("cupJoin",{mk});
+  CUP.joinTimer=setInterval(()=>NET.send("cupJoin",{mk}),700);
+}
+function launchCupPairing(){
+  if(!CUP.pendingMk)return;
+  clearInterval(CUP.joinTimer); CUP.joinTimer=null;
+  const {round,matchIdx}=CUP.pendingInfo; const mk=CUP.pendingMk;
+  CUP.pendingMk=null;
+  const m=CUP.bracket.rounds[round][matchIdx];
+  NET.role=(CUP.mySlot===m.a)?"A":"B";
+  const roundDiff=[0.4,0.55,0.7][round]||0.5;
+  startMatch("online",{autoKeeper:false,difficulty:roundDiff,
+    cupTeams:{a:CUP.slots[m.a].team,b:CUP.slots[m.b].team},
+    cupNames:[CUP.slots[m.a].name,CUP.slots[m.b].name],
+    cup:{round,matchIdx,mk}});
+}
+function finishCupMatch(){
+  match.phase="idle"; $("#vignette").classList.remove("show"); AU.heartbeat(false);
+  const {round,matchIdx}=match.cup;
+  const m=CUP.bracket.rounds[round][matchIdx];
+  const mySlotIsA=(m.a===CUP.mySlot);
+  let scoreA,scoreB;
+  if(match.mode==="online"){ scoreA=match.scoreA; scoreB=match.scoreB; }
+  else { scoreA=mySlotIsA?match.scoreA:match.scoreB; scoreB=mySlotIsA?match.scoreB:match.scoreA; }
+  const meWon=mySlotIsA?scoreA>scoreB:scoreB>scoreA;
+  shooter.kick=0; shooter.celebrate=meWon?1:0; shooter.sad=meWon?0:1;
+  cam.zoom=1;
+  NET.send("cupResult",{round,matchIdx,scoreA,scoreB});
+  applyCupResult(round,matchIdx,scoreA,scoreB);
+  CUP.startedMk=null;
+  const iWon=m.winner===CUP.mySlot;
+  setTimeout(()=>{
+    if(!iWon){
+      CUP.eliminated=true;
+      $("#elim-score").textContent=scoreA+" - "+scoreB;
+      showScreen("cup-elim-ui");
+    } else {
+      showScreen("cup-bracket-ui"); renderCupBracket();
+      confettiBurst(); AU.cheer(true);
+    }
+    refreshMenuStats();
+  },900);
+}
+function renderCupBracket(){
+  if(!CUP.bracket)return;
+  const ROUND_LABELS=["QUARTS DE FINALE","DEMI-FINALES","FINALE"];
+  const wrap=$("#cup-bracket-list"); wrap.innerHTML="";
+  CUP.bracket.rounds.forEach((matches,ri)=>{
+    const h=document.createElement("div"); h.className="cup-round-h"; h.textContent=ROUND_LABELS[ri];
+    wrap.appendChild(h);
+    matches.forEach((m,mi)=>{
+      const an=m.a!=null?CUP.slots[m.a]:null, bn=m.b!=null?CUP.slots[m.b]:null;
+      const mine=(m.a===CUP.mySlot||m.b===CUP.mySlot);
+      const row=document.createElement("div");
+      row.className="cup-match"+(mine&&!m.played?" mine":"")+(m.played?" done":"");
+      const nameA=an?an.name+(an.isAI?" 🤖":""):"?";
+      const nameB=bn?bn.name+(bn.isAI?" 🤖":""):"?";
+      const score=m.played?`${m.scoreA} - ${m.scoreB}`:(an&&bn?"À VENIR":"…");
+      row.innerHTML=`<span class="side">${nameA}</span><span class="sc">${score}</span><span class="side right">${nameB}</span>`;
+      wrap.appendChild(row);
+    });
+  });
+  const action=$("#cup-turn-area");
+  if(CUP.champion!=null){
+    const champ=CUP.slots[CUP.champion];
+    action.innerHTML=`<div style="text-align:center;width:100%">
+      <div style="font-size:14px;color:var(--muted);letter-spacing:.14em">🏆 CHAMPION</div>
+      <div style="font-size:24px;font-weight:900;font-style:italic;color:var(--gold-2)">${champ.name}</div></div>`;
+    if(!CUP.champWasShown){ CUP.champWasShown=true; confettiBurst(); setTimeout(confettiBurst,700); AU.cheer(true); }
+  } else if(CUP.eliminated){
+    action.innerHTML=`<p style="color:var(--muted);text-align:center;font-size:14px;margin:0">
+      Tu es éliminé — tu regardes la suite du tournoi.</p>`;
+  } else {
+    const p=findMyPendingMatch();
+    if(p){
+      action.innerHTML=`<button class="btn gold" id="cup-play-btn" style="width:100%">🎯 C'est ton tour — Jouer</button>`;
+      $("#cup-play-btn").onclick=()=>{AU.ui();checkMyCupTurn();};
+    } else {
+      action.innerHTML=`<p style="color:var(--muted);text-align:center;font-size:14px;margin:0">
+        En attente des autres matchs…</p>`;
+    }
+  }
+}
+
 $("#b-tournoi").onclick=()=>{AU.ui();openTournoi();};
+$("#b-equipe").onclick=()=>{AU.ui();openEquipe();};
 $("#b-vestiaire").onclick=()=>{AU.ui();openVestiaire();};
 $("#b-reglages").onclick=()=>{AU.ui();openReglages();};
 document.querySelectorAll("[data-back]").forEach(el=>el.onclick=()=>{AU.ui();toMenu();});
@@ -1874,6 +2389,34 @@ $("#r-again").onclick=()=>{AU.ui();
     autoKeeper:match.autoKeeper});};
 
 /* ---------- VESTIAIRE ---------- */
+/* ---------- ÉQUIPE ---------- */
+let equipeTab="nation";
+function openEquipe(){
+  state="menu"; showScreen("equipe-ui");
+  const tabs=$("#equipe-tabs"); tabs.innerHTML="";
+  const cats=[{id:"nation",label:"Sélections"}].concat(LEAGUES);
+  cats.forEach(c=>{
+    const b=document.createElement("div");
+    b.className="tab-chip"+(equipeTab===c.id?" on":"");
+    b.textContent=c.label;
+    b.onclick=()=>{AU.ui();equipeTab=c.id;openEquipe();};
+    tabs.appendChild(b);
+  });
+  const wrap=$("#equipe-cards"); wrap.innerHTML="";
+  Object.keys(TEAMS).filter(id=>equipeTab==="nation"?TEAMS[id].type==="nation":TEAMS[id].league===equipeTab)
+    .forEach(id=>{
+      const t=TEAMS[id], sel=save.team===id;
+      const card=document.createElement("div");
+      card.className="card glass"+(sel?" sel":"");
+      const numberColor=isLight(t.c1)?"#12213f":"#f2c14e";
+      card.innerHTML=`<div class="jersey-swatch" style="background:linear-gradient(115deg,${t.c1} 58%,${t.c2} 58%)">
+        <span class="num" style="color:${numberColor}">${t.num}</span></div>
+        <div class="nm">${t.name}</div>
+        <div class="lg">${sel?"✔ ÉQUIPE ACTUELLE":(t.type==="nation"?"Sélection":LEAGUES.find(l=>l.id===t.league).label)}</div>`;
+      card.onclick=()=>{AU.ui();save.team=id;persist();openEquipe();};
+      wrap.appendChild(card);
+    });
+}
 function openVestiaire(){
   state="menu"; showScreen("vestiaire-ui"); refreshMenuStats();
   const wrap=$("#ball-cards"); wrap.innerHTML="";
