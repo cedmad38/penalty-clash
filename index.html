@@ -1205,7 +1205,18 @@ Choisis ta zone en secret, puis rends le téléphone au tireur.`,()=>{
       });
     });
   } else if(match.mode==="online"){
-    if(match.turn===NET.role)beginAim();
+    if(match.turn===NET.role){
+      // ne tirer que lorsque la zone du gardien adverse est arrivée (sinon il ne plonge jamais)
+      if(match.pendingZones[match.kickIdx]!==undefined)beginAim();
+      else{
+        match.phase="waitzone";
+        shooter.visible=true; gk.kit=KIT_GK_AI;
+        banner("IL CHOISIT SA ZONE…","blue-t");
+        hint("Ton adversaire se place sur sa ligne…");
+        clearTimeout(match.waitTimer);
+        match.waitTimer=setTimeout(()=>{ if(match.phase==="waitzone")beginAim(); },3000);
+      }
+    }
     else beginOnlineKeep();
   }
   else if(match.turn==="A"){ beginAim(); }
@@ -1591,7 +1602,7 @@ function countUp(sel,val,dur,prefix){
 function drawShooter(t){
   const kit=match.turn==="A"?match.kits[0]:match.kits[1];
   let px,pz,pose={},facing=1;
-  if(match.phase==="aim"||match.phase==="guess"||match.phase==="secretpick"){
+  if(match.phase==="aim"||match.phase==="guess"||match.phase==="secretpick"||match.phase==="waitzone"){
     // attente : respiration + regard vers le but
     const br=Math.sin(t*2.2)*.02;
     px=1.05; pz=-1.05;
@@ -1806,7 +1817,9 @@ function openSalon(code,isHost){
     }
   };
   NET.onEvent=(ev,p)=>{
-    if(ev==="zone"&&p){ match.pendingZones[p.k]=p.z; }
+    if(ev==="zone"&&p){ match.pendingZones[p.k]=p.z;
+      if(p.k===match.kickIdx&&match.phase==="waitzone"&&match.turn===NET.role){
+        clearTimeout(match.waitTimer); beginAim(); } }
     else if(ev==="kick"&&p){
       match.pendingKicks[p.k]=p;
       if(p.k===match.kickIdx&&match.phase==="guess")applyRemoteKick(p);
