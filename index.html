@@ -1448,6 +1448,9 @@ function nextKick(){
   resetBall(); gk.dive=null; gk.diveT=0; shooter.kick=0; shooter.celebrate=0; shooter.sad=0;
   match.outcome=null; match.aim=null; match.keeperZone=null; match.playerZone=null;
   match.kickRands=null; match.kickCurve=null;
+  // numéro de maillot tiré au sort à chaque tir, indépendamment pour chaque équipe
+  match.kits[0].num=String(Math.floor(rnd(2,21)));
+  match.kits[1].num=String(Math.floor(rnd(2,21)));
   cam.zoom=1; cam.ox=0; cam.oy=0;
   match.decisive=isDecisiveKick();
   $("#vignette").classList.toggle("show",match.decisive);
