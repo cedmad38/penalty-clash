@@ -218,6 +218,11 @@ h1.logo .l3::before,h1.logo .l3::after{content:"★";font-size:.7em;vertical-ali
 .lobby-row .info b{display:block;font-size:14px;font-style:italic;text-transform:uppercase;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lobby-row .info span{font-size:11px;color:var(--muted)}
+.champ-trophy{width:150px;height:auto;filter:drop-shadow(0 0 30px rgba(242,193,78,.65)) drop-shadow(0 14px 20px rgba(0,0,0,.6));
+  opacity:0;transform:scale(.5) translateY(20px);animation:champPop 1s cubic-bezier(.2,1.6,.4,1) forwards,champFloat 4s ease-in-out .9s infinite}
+.rm .champ-trophy{animation:champPop 1s cubic-bezier(.2,1.6,.4,1) forwards}
+@keyframes champPop{to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes champFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-9px) rotate(1.5deg)}}
 .setting-row{display:flex;align-items:center;justify-content:space-between;width:100%;padding:15px 4px;
   border-bottom:1px solid rgba(120,180,255,.14);font-size:16px;font-weight:700}
 .seg{display:flex;border-radius:10px;overflow:hidden;border:1px solid var(--glass-edge)}
@@ -398,6 +403,19 @@ input.txt:focus{border-color:var(--cyan);box-shadow:0 0 14px rgba(63,214,255,.3)
     <div id="cup-turn-area" class="panel-center glass" style="margin:6px 0 10px;padding:16px 18px;gap:10px"></div>
     <div id="cup-bracket-list" style="width:min(380px,92vw);display:flex;flex-direction:column;gap:6px;
       overflow-y:auto;padding-bottom:calc(24px + var(--safe-bottom));pointer-events:auto"></div>
+  </div>
+
+  <!-- COMPÉTITION : champion -->
+  <div class="screen" id="cup-champion-ui">
+    <div class="panel-center glass" style="gap:6px">
+      <div style="font-size:13px;font-weight:800;letter-spacing:.3em;color:var(--gold-2)" id="champ-comp">COMPÉTITION</div>
+      <div id="champ-trophy" class="champ-trophy"></div>
+      <div style="font-size:34px;font-weight:900;font-style:italic;text-transform:uppercase;
+        letter-spacing:.04em;color:var(--gold-2);text-shadow:0 0 24px rgba(242,193,78,.7);margin-top:4px">CHAMPION</div>
+      <div id="champ-name" style="font-size:24px;font-weight:900;font-style:italic;text-transform:uppercase;
+        color:#fff;text-shadow:0 3px 10px rgba(0,0,0,.7)">—</div>
+      <button class="btn gold" id="champ-leave" style="width:100%;margin-top:14px">Quitter</button>
+    </div>
   </div>
 
   <!-- COMPÉTITION : élimination -->
@@ -1699,14 +1717,15 @@ function resolveShot(){
   else{
     const shotZone=zoneOf(a.x,a.y);
     const kz=match.keeperZone;
-    const sameCol=(shotZone%3)===(kz%3);
-    const sameRow=Math.floor(shotZone/3)===Math.floor(kz/3);
-    if(sameCol){
-      const cornerness=clamp((Math.abs(a.x)/3.66)*.6+(a.y>1.3?( (a.y-1.3)/1.14)*.4:((1.3-a.y)/1.3)*.15),0,1);
-      let p=.86-cornerness*.62-pw*.16;
-      if(!sameRow)p*=.42;
-      if(shotZone===4||shotZone===1)p=Math.max(p,.55); // plein centre : facile
-      result=match.kickRands.save<clamp(p,.04,.94)?"save":"goal";
+    const sameZone=shotZone===kz;              // lecture parfaite : bonne colonne ET bonne hauteur
+    const sameCol=(shotZone%3)===(kz%3);        // bon côté, mauvaise hauteur
+    if(sameZone){
+      const cornerness=clamp((Math.abs(a.x)/3.66)*.5+(a.y>1.3?( (a.y-1.3)/1.14)*.3:((1.3-a.y)/1.3)*.1),0,1);
+      let p=.82-cornerness*.32-pw*.14; // une lecture parfaite reste toujours au moins compétitive
+      if(shotZone===4||shotZone===1)p=Math.max(p,.6); // plein centre : facile
+      result=match.kickRands.save<clamp(p,.3,.92)?"save":"goal";
+    } else if(sameCol){
+      result=match.kickRands.save<.16?"save":"goal"; // bon côté mais mauvaise hauteur : réflexe rare
     } else result="goal";
   }
   applyResult(result,a,pw);
@@ -1906,7 +1925,8 @@ function stepShake(dt){
    UI — écrans, navigation
 ============================================================ */
 const screens=["splash-ui","menu-ui","hud","mode-ui","duo-ui","online-ui","pass-ui","result-ui","equipe-ui",
-  "vestiaire-ui","reglages-ui","tournoi-ui","cup-pick-ui","cup-salon-ui","cup-lobby-ui","cup-bracket-ui","cup-elim-ui"];
+  "vestiaire-ui","reglages-ui","tournoi-ui","cup-pick-ui","cup-salon-ui","cup-lobby-ui","cup-bracket-ui",
+  "cup-champion-ui","cup-elim-ui"];
 function showScreen(id){
   screens.forEach(s=>$("#"+s).classList.toggle("on",s===id));
 }
@@ -2128,6 +2148,43 @@ $("#online-join").onclick=()=>{AU.ui();
 const CUP={competition:null,isHost:false,slots:null,bracket:null,mySlot:null,
   eliminated:false,champion:null,champWasShown:false,startedMk:null,
   pendingMk:null,pendingInfo:null,joinTimer:null};
+
+/* trophées originaux (aucun logo/design officiel reproduit) */
+const TROPHY_WORLD_SVG=`<svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="gW" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#fff4c2"/><stop offset=".5" stop-color="#f2c14e"/><stop offset="1" stop-color="#a3701c"/>
+</linearGradient></defs>
+<ellipse cx="100" cy="248" rx="44" ry="9" fill="rgba(0,0,0,.35)"/>
+<rect x="72" y="216" width="56" height="16" rx="4" fill="url(#gW)"/>
+<rect x="91" y="150" width="18" height="68" fill="url(#gW)"/>
+<path d="M70 150 C54 150 48 118 53 92 C57 74 74 63 100 63 C126 63 143 74 147 92
+  C152 118 146 150 130 150 C118 150 116 138 100 138 C84 138 82 150 70 150 Z" fill="url(#gW)"/>
+<path d="M55 96 C32 98 24 126 46 140" stroke="url(#gW)" stroke-width="8" fill="none" stroke-linecap="round"/>
+<path d="M145 96 C168 98 176 126 154 140" stroke="url(#gW)" stroke-width="8" fill="none" stroke-linecap="round"/>
+<rect x="93" y="46" width="14" height="18" fill="url(#gW)"/>
+<circle cx="100" cy="30" r="20" fill="url(#gW)"/>
+<g stroke="#8a5f14" stroke-width="1.6" fill="none" opacity=".55">
+<ellipse cx="100" cy="30" rx="20" ry="8"/><ellipse cx="100" cy="30" rx="8" ry="20"/>
+</g>
+<circle cx="100" cy="30" r="3" fill="#fff4c2"/>
+</svg>`;
+const TROPHY_EURO_SVG=`<svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg">
+<defs><linearGradient id="gE" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#eaf3ff"/><stop offset=".45" stop-color="#8fb6e6"/><stop offset="1" stop-color="#f2c14e"/>
+</linearGradient></defs>
+<ellipse cx="100" cy="248" rx="38" ry="9" fill="rgba(0,0,0,.35)"/>
+<rect x="78" y="216" width="44" height="16" rx="4" fill="url(#gE)"/>
+<rect x="93" y="140" width="14" height="78" fill="url(#gE)"/>
+<path d="M76 140 C63 140 57 112 61 88 C64 68 80 56 100 56 C120 56 136 68 139 88
+  C143 112 137 140 124 140 C114 140 112 130 100 130 C88 130 86 140 76 140 Z" fill="url(#gE)"/>
+<path d="M62 90 C42 92 36 116 54 128" stroke="url(#gE)" stroke-width="7" fill="none" stroke-linecap="round"/>
+<path d="M138 90 C158 92 164 116 146 128" stroke="url(#gE)" stroke-width="7" fill="none" stroke-linecap="round"/>
+<g fill="#f2c14e">
+<path d="M100 14 l4 9 10 1-7.5 7 2.5 10-9-5.5-9 5.5 2.5-10-7.5-7 10-1z"/>
+<path d="M64 40 l2.5 6 6 .6-4.5 4.5 1.5 6-5.5-3.5-5.5 3.5 1.5-6-4.5-4.5 6-.6z"/>
+<path d="M136 40 l2.5 6 6 .6-4.5 4.5 1.5 6-5.5-3.5-5.5 3.5 1.5-6-4.5-4.5 6-.6z"/>
+</g>
+</svg>`;
 function pickTeamOfType(type,exclude){
   exclude=exclude||[];
   const ids=Object.keys(TEAMS).filter(k=>TEAMS[k].type===type&&exclude.indexOf(k)===-1);
@@ -2171,7 +2228,7 @@ function openCupSalon(code,isHost){
   const name=myCupName();
   const wantType=CUP.competition==="monde"?"nation":"club";
   const cteam=(TEAMS[save.team]&&TEAMS[save.team].type===wantType)?save.team:pickTeamOfType(wantType);
-  showScreen("cup-lobby-ui");
+  state="menu"; showScreen("cup-lobby-ui");
   $("#lobby-players").innerHTML=""; $("#lobby-msg").textContent="Connexion…";
   NET.connect("CUP"+code,isHost,name,ok=>{
     if(!ok){ banner("CONNEXION IMPOSSIBLE","blue-t"); NET.leave(); showScreen("cup-salon-ui"); return; }
@@ -2237,7 +2294,7 @@ function applyCupStart(slots,bracket){
   CUP.slots=slots; CUP.bracket=bracket; CUP.champion=null; CUP.champWasShown=false; CUP.eliminated=false;
   CUP.mySlot=slots.findIndex(s=>s.key===NET.myKey);
   $("#cup-bracket-title").textContent=CUP.competition==="monde"?"Coupe du Monde":"Ligue des Champions";
-  showScreen("cup-bracket-ui");
+  state="menu"; showScreen("cup-bracket-ui");
   renderCupBracket();
 }
 function applyCupResult(round,matchIdx,scoreA,scoreB){
@@ -2318,10 +2375,13 @@ function finishCupMatch(){
   CUP.startedMk=null;
   const iWon=m.winner===CUP.mySlot;
   setTimeout(()=>{
+    state="menu";
     if(!iWon){
       CUP.eliminated=true;
       $("#elim-score").textContent=scoreA+" - "+scoreB;
       showScreen("cup-elim-ui");
+    } else if(CUP.champion===CUP.mySlot){
+      showCupChampion();
     } else {
       showScreen("cup-bracket-ui"); renderCupBracket();
       confettiBurst(); AU.cheer(true);
@@ -2354,7 +2414,7 @@ function renderCupBracket(){
     action.innerHTML=`<div style="text-align:center;width:100%">
       <div style="font-size:14px;color:var(--muted);letter-spacing:.14em">🏆 CHAMPION</div>
       <div style="font-size:24px;font-weight:900;font-style:italic;color:var(--gold-2)">${champ.name}</div></div>`;
-    if(!CUP.champWasShown){ CUP.champWasShown=true; confettiBurst(); setTimeout(confettiBurst,700); AU.cheer(true); }
+    if(!CUP.champWasShown)showCupChampion();
   } else if(CUP.eliminated){
     action.innerHTML=`<p style="color:var(--muted);text-align:center;font-size:14px;margin:0">
       Tu es éliminé — tu regardes la suite du tournoi.</p>`;
@@ -2369,6 +2429,18 @@ function renderCupBracket(){
     }
   }
 }
+function showCupChampion(){
+  CUP.champWasShown=true;
+  const champ=CUP.slots[CUP.champion];
+  const isWorld=CUP.competition==="monde";
+  $("#champ-comp").textContent=isWorld?"COUPE DU MONDE":"LIGUE DES CHAMPIONS";
+  $("#champ-trophy").innerHTML=isWorld?TROPHY_WORLD_SVG:TROPHY_EURO_SVG;
+  $("#champ-name").textContent=champ.name+(champ.isAI?" 🤖":"");
+  state="menu"; showScreen("cup-champion-ui");
+  confettiBurst(); setTimeout(confettiBurst,500); setTimeout(confettiBurst,1000);
+  AU.cheer(true);
+}
+$("#champ-leave").onclick=()=>{AU.ui();NET.leave();toMenu();};
 
 $("#b-tournoi").onclick=()=>{AU.ui();openTournoi();};
 $("#b-equipe").onclick=()=>{AU.ui();openEquipe();};
