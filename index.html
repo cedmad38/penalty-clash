@@ -1331,7 +1331,23 @@ const match={mode:"ia",phase:"idle",shotIdx:0,maxShots:5,sudden:false,
   scoreA:0,scoreB:0,dotsA:[],dotsB:[],turn:"A",roleA:"shoot",
   difficulty:.45,names:["TOI","IA"],kits:[KIT_PLAYER,KIT_AI],
   aim:null,power:0,keeperZone:null,playerZone:null,decisive:false,
+  keeperExtension:"normale",keeperQualiteTiming:.6,holdStart:null,
   timer:0,outcome:null,tourRound:-1};
+/* ---------- système de tir (adresse/timing/collision réelle, voir DESIGN_SYSTEME_TIR) ---------- */
+const ZONE_CENTERS_M=[{x:-2.6,y:.6},{x:0,y:.6},{x:2.6,y:.6},{x:-2.6,y:1.9},{x:0,y:1.9},{x:2.6,y:1.9}];
+const EXT_MULT={courte:1.15,normale:1.60,maximale:2.05};
+const TEMPS_MAX_MAINTIEN=1.3; // secondes pour puissance 100%
+function triangulaire(d){
+  const u=Math.random();
+  return u<0.5 ? -d+d*Math.sqrt(2*u) : d-d*Math.sqrt(2*(1-u));
+}
+function difficulteCadrage(xvNorm,yvNorm){
+  return clamp(0.65*Math.abs(xvNorm)+0.35*Math.abs(2*yvNorm-1),0,1.3);
+}
+function qualiteTimingGardien(reactMs){
+  const ideal=650,fenetre=550;
+  return clamp(1-Math.abs(reactMs-ideal)/fenetre,0,1);
+}
 const shooter={x:.8,z:-1.6,run:0,visible:false,kick:0,celebrate:0,sad:0};
 const gk={x:0,dive:null,diveT:0,idleT:0,kit:KIT_GK_AI};
 
@@ -1445,9 +1461,10 @@ function checkEnd(){
 
 function nextKick(){
   if(state!=="match")return;
-  clearTimeout(match.powerTimeout); drag.on=false;
+  drag.on=false; match.holdStart=null;
   resetBall(); gk.dive=null; gk.diveT=0; shooter.kick=0; shooter.celebrate=0; shooter.sad=0;
   match.outcome=null; match.aim=null; match.keeperZone=null; match.playerZone=null;
+  match.keeperExtension="normale"; match.keeperQualiteTiming=.6;
   match.kickRands=null; match.kickCurve=null;
   // numéro de maillot tiré au sort à chaque tir, indépendamment pour chaque équipe
   match.kits[0].num=String(Math.floor(rnd(2,21)));
@@ -1462,8 +1479,9 @@ function nextKick(){
     // le gardien choisit sa zone en secret d'abord
     showPass(`${match.turn==="A"?match.names[1]:match.names[0]} prend le téléphone : tu es le GARDIEN.
 Choisis ta zone en secret, puis rends le téléphone au tireur.`,()=>{
-      match.phase="secretpick"; showZoneGrid(true,z=>{
-        match.keeperZone=z; hideZoneGrid();
+      match.phase="secretpick"; showZoneGrid(true,(z,ext,reactMs)=>{
+        match.keeperZone=z; match.keeperExtension=ext; match.keeperQualiteTiming=qualiteTimingGardien(reactMs);
+        hideZoneGrid();
         showPass(`${shootLabel} reprend le téléphone : à toi de TIRER !`,()=>beginAim());
       });
     });
@@ -1493,8 +1511,9 @@ function beginOnlineKeep(){
   gk.kit=KIT_GK_P;
   banner("ARRÊTE CE TIR !","blue-t");
   hint("Choisis ta zone AVANT que "+(match.turn==="A"?match.names[0]:match.names[1])+" ne frappe !");
-  showZoneGrid(false,z=>{ hideZoneGrid(); hint("Zone choisie — il arme sa frappe…");
-    NET.send("zone",{k:match.kickIdx,z,mk:match.cup?match.cup.mk:null}); });
+  showZoneGrid(false,(z,ext,reactMs)=>{ hideZoneGrid(); hint("Zone choisie — il arme sa frappe…");
+    const qt=qualiteTimingGardien(reactMs);
+    NET.send("zone",{k:match.kickIdx,z,ext,qt,mk:match.cup?match.cup.mk:null}); });
   // si le tir adverse est déjà arrivé (téléphone plus lent), le jouer maintenant
   const pk=match.pendingKicks&&match.pendingKicks[match.kickIdx];
   if(pk)applyRemoteKick(pk);
@@ -1524,34 +1543,37 @@ function beginAim(){
   updateScoreUI();
 }
 /* — puissance en 2 temps : viser, puis toucher la jauge pile sur la zone dorée — */
-function currentPowerPos(){
-  const period=1.05;
-  const el=performance.now()/1000-match.powerStart;
+/* — nouvelle mécanique : maintenir pour charger la puissance, un curseur de réflexe
+   oscille en parallèle ; le relâchement détermine Puissance ET ErreurTiming — */
+function currentTimingPos(){
+  const period=0.85;
+  const el=performance.now()/1000-match.holdStart/1000;
   const f=(el/period)%2;
-  return f<1?f:2-f; // aller-retour 0 → 1 → 0
+  return f<1?f:2-f; // 0 → 1 → 0 ; 0 = relâchement idéal
 }
 function beginPowerCharge(target){
   match.phase="power";
   match.powerTarget=target;
-  match.powerStart=performance.now()/1000;
-  match.sweetLo=.82; match.sweetHi=.94;
-  match.wasInSweet=false;
-  hint("Touche l'écran pile sur la zone dorée !");
-  clearTimeout(match.powerTimeout);
-  match.powerTimeout=setTimeout(()=>{ if(match.phase==="power")lockPower(currentPowerPos()); },3200);
+  match.holdStart=null;
+  hint("Touche et maintiens pour charger, relâche au bon moment !");
 }
-function lockPower(pos){
-  if(match.phase!=="power")return;
-  clearTimeout(match.powerTimeout);
-  const sweet=pos>=match.sweetLo&&pos<=match.sweetHi;
-  const power=sweet?1:clamp(pos,.18,1);
-  const errMul=sweet?.45:1;
-  const err=(.14+power*.55)*errMul;
+function lockPower(){
+  if(match.phase!=="power"||match.holdStart==null)return;
+  const heldS=(performance.now()-match.holdStart)/1000;
+  const erreurTiming=currentTimingPos();
+  match.holdStart=null;
+  const puissance=clamp(heldS/TEMPS_MAX_MAINTIEN,0,1);
   const t=match.powerTarget;
-  match.aim={x:t.x+rnd(-err,err),y:clamp(t.y+rnd(-err*.7,err*.7),.05,3.4)};
-  match.power=power;
+  const xvNorm=t.x/(GOAL.w/2), yvNorm=t.y/GOAL.h;
+  const diff=difficulteCadrage(xvNorm,yvNorm);
+  const penP=Math.max(0,puissance-0.70)*1.8;
+  const disp=Math.min(0.06+0.20*diff+0.25*penP+0.30*erreurTiming,0.55);
+  const xfNorm=xvNorm+triangulaire(disp);
+  const yfNorm=yvNorm+triangulaire(disp*0.65);
+  match.aim={x:xfNorm*(GOAL.w/2), y:clamp(yfNorm*GOAL.h,.05,3.6)};
+  match.power=puissance;
   hint("");
-  if(sweet){ bigWord("PARFAIT !","g"); buzz([10,10,30]); }
+  if(erreurTiming<0.12){ bigWord("TIMING PARFAIT !","g"); buzz([10,10,30]); }
   else buzz(16);
   startRun();
 }
@@ -1561,8 +1583,9 @@ function beginGuess(){
   gk.kit=KIT_GK_P;
   banner("ARRÊTE CE TIR !","blue-t");
   hint("Touche la zone où tu plonges — avant la frappe !");
-  showZoneGrid(false,z=>{ match.playerZone=z; match.keeperZone=z; hideZoneGrid();
-    hint(""); startAIRun(); });
+  showZoneGrid(false,(z,ext,reactMs)=>{ match.playerZone=z; match.keeperZone=z;
+    match.keeperExtension=ext; match.keeperQualiteTiming=qualiteTimingGardien(reactMs);
+    hideZoneGrid(); hint(""); startAIRun(); });
   // l'IA tire dans 3s même si pas de choix
   match.guessTimer=setTimeout(()=>{ if(match.phase==="guess"){ hideZoneGrid(); startAIRun(); } },3400);
   updateScoreUI();
@@ -1586,6 +1609,8 @@ function startAIRun(){
     const col=Math.random()<.56?aimCol:[0,1,2].filter(c=>c!==aimCol)[Math.floor(rnd(0,2))];
     const row=Math.random()<.62?aimRow:1-aimRow;
     match.keeperZone=row*3+col;
+    match.keeperExtension=Math.random()<.5?"normale":(Math.random()<.5?"courte":"maximale");
+    match.keeperQualiteTiming=clamp(rnd(.4,.7),0,1);
   }
 }
 
@@ -1596,14 +1621,15 @@ canvas.addEventListener("pointerdown",e=>{
   if(state!=="match")return;
   if(match.phase==="aim"){
     drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY;
-  } else if(match.phase==="power"){
-    lockPower(currentPowerPos());
+  } else if(match.phase==="power"&&match.holdStart==null){
+    match.holdStart=performance.now();
   }
 });
 canvas.addEventListener("pointermove",e=>{
   if(!drag.on)return; drag.cx=e.clientX; drag.cy=e.clientY;
 });
 window.addEventListener("pointerup",e=>{
+  if(state==="match"&&match.phase==="power"&&match.holdStart!=null){ lockPower(); return; }
   if(!drag.on)return; drag.on=false;
   if(state!=="match"||match.phase!=="aim")return;
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
@@ -1630,6 +1656,8 @@ function startRun(){
     if(Math.random()<.34+d*.45)col=aimCol; else col=[0,1,2].filter(c=>c!==aimCol)[Math.floor(rnd(0,2))];
     row=Math.random()<.62?aimRow:1-aimRow;
     match.keeperZone=row*3+col;
+    match.keeperExtension=Math.random()<.3+d*.4?"maximale":(Math.random()<.5?"normale":"courte");
+    match.keeperQualiteTiming=clamp(rnd(.35,.65)+d*.3,0,1);
   }
   // en 2p la zone gardien a déjà été choisie en secret
   if(match.keeperZone==null)match.keeperZone=Math.floor(rnd(0,6));
@@ -1642,6 +1670,9 @@ function stepMatch(dt,t){
   stepRain(dt,st); drawRain(st);
   stepNet(dt);
   drawMist(st,.8);
+
+  // garde-fou : si le joueur maintient sans relâcher (app en pause, distraction…), on tire quand même
+  if(match.phase==="power"&&match.holdStart!=null&&performance.now()-match.holdStart>2600)lockPower();
 
   if(match.phase==="run"){
     match.timer+=dt;
@@ -1705,8 +1736,10 @@ function launchBall(){
   const pw=match.power||.7;
   // en ligne, côté tireur : figer la zone du gardien adverse + les aléas, et tout envoyer
   if(match.mode==="online"&&match.turn===NET.role){
-    match.keeperZone=(match.pendingZones&&match.pendingZones[match.kickIdx]!==undefined)
-      ?match.pendingZones[match.kickIdx]:null;
+    const pz=match.pendingZones&&match.pendingZones[match.kickIdx];
+    if(pz){ match.keeperZone=pz.z; match.keeperExtension=pz.ext||"normale";
+      match.keeperQualiteTiming=pz.qt!=null?pz.qt:.6; }
+    else match.keeperZone=null;
     match.kickRands={save:Math.random(),caught:Math.random(),postIn:Math.random()};
     match.kickCurve=rnd(-.35,.35)*(1-pw*.4);
     NET.send("kick",{k:match.kickIdx,aim:match.aim,power:match.power,
@@ -1733,11 +1766,6 @@ function startDive(){
   gk.dive={dir:col===1?0:(col===0?-1:1),high:row===1,col,row};
   gk.diveT=0;
 }
-function zoneOf(x,y){
-  const col=x<-1.25?0:x>1.25?2:1;
-  const row=y>1.3?1:0;
-  return row*3+col;
-}
 function resolveShot(){
   const a=match.aim,pw=match.power||.7;
   // aléas du tir : pré-tirés (et partagés en ligne pour un résultat identique sur les 2 téléphones)
@@ -1745,27 +1773,35 @@ function resolveShot(){
   const inX=Math.abs(a.x)<GOAL.w/2-.12, inY=a.y<GOAL.h-.08;
   const postX=Math.abs(a.x)>=GOAL.w/2-.12&&Math.abs(a.x)<=GOAL.w/2+.16;
   const barY=a.y>=GOAL.h-.08&&a.y<=GOAL.h+.14&&Math.abs(a.x)<GOAL.w/2;
-  let result;
+  let result, saveCategory=null;
   if(postX&&a.y<GOAL.h+.1||barY){ result="post"; }
   else if(!inX||!inY){ result="miss"; }
-  else if(match.keeperZone==null){ result="goal"; } // gardien immobile
+  else if(match.keeperZone==null){ result="goal"; } // gardien immobile : aucune interception possible
   else{
-    const shotZone=zoneOf(a.x,a.y);
-    const kz=match.keeperZone;
-    const sameZone=shotZone===kz;              // lecture parfaite : bonne colonne ET bonne hauteur
-    const sameCol=(shotZone%3)===(kz%3);        // bon côté, mauvaise hauteur
-    if(sameZone){
-      const cornerness=clamp((Math.abs(a.x)/3.66)*.5+(a.y>1.3?( (a.y-1.3)/1.14)*.3:((1.3-a.y)/1.3)*.1),0,1);
-      let p=.82-cornerness*.32-pw*.14; // une lecture parfaite reste toujours au moins compétitive
-      if(shotZone===4||shotZone===1)p=Math.max(p,.6); // plein centre : facile
-      result=match.kickRands.save<clamp(p,.3,.92)?"save":"goal";
-    } else if(sameCol){
-      result=match.kickRands.save<.16?"save":"goal"; // bon côté mais mauvaise hauteur : réflexe rare
-    } else result="goal";
+    // étape 1 : collision géométrique réelle (distance entre l'impact et le point atteint par le gardien)
+    const zc=ZONE_CENTERS_M[match.keeperZone];
+    const dist=Math.hypot(a.x-zc.x,a.y-zc.y);
+    const ext=match.keeperExtension||"normale";
+    const qDir=clamp(1-dist/1.8,0,1); // qualité de la lecture de direction (zone large : tolérance 1,8 m)
+    const qTim=match.keeperQualiteTiming!=null?match.keeperQualiteTiming:.6;
+    const portee=1.35*qDir*qTim*EXT_MULT[ext]; // portée du gardien (m)
+    const rayon=portee+.15; // + marge géométrique du corps
+    if(dist>rayon){ result="goal"; } // hors de portée : aucun contact possible
+    else{
+      // étape 2 : qualité du contact (jamais un tirage au sort — juste la physique du geste)
+      let chance=clamp(1-dist/rayon-.35*pw+.25*qTim,0,1);
+      if(chance<.20)saveCategory="doigts";
+      else if(chance<.45)saveCategory="moyen";
+      else if(chance<.75)saveCategory="fort";
+      else saveCategory="net";
+      // contrôle réduit : extension maximale ou tir très puissant = jamais de captation franche
+      if(saveCategory==="net"&&(ext==="maximale"||pw>=.85))saveCategory="fort";
+      result="save";
+    }
   }
-  applyResult(result,a,pw);
+  applyResult(result,a,pw,saveCategory);
 }
-function applyResult(result,a,pw){
+function applyResult(result,a,pw,saveCategory){
   match.phase="outcome"; match.timer=0;
   const shooterIsA=match.turn==="A";
   const humanShot=match.mode==="2p"||shooterIsA;
@@ -1783,13 +1819,22 @@ function applyResult(result,a,pw){
     else { bigWord("BUT ENCAISSÉ","r"); AU.aww(); }
   }
   else if(result==="save"){
-    const caught=(match.kickRands?match.kickRands.caught:Math.random())<.45;
+    // catégorie déterministe (issue de la qualité géométrique du contact, pas d'un tirage au sort) :
+    // "doigts"/"moyen" = jamais capté (contact trop faible) ; "fort" = capté ou repoussé selon un peu de variété ;
+    // "net" = captation franche assurée
+    const caught = saveCategory==="net" ? true
+      : saveCategory==="fort" ? (match.kickRands?match.kickRands.caught:Math.random())<.5
+      : false;
     AU.gloves();
     shooter.sad=1;
     if(caught){ ball.held=true; match.outcome={anim:"held"}; ball.visible=false; }
     else match.outcome={anim:"parry",vx:Math.sign(a.x||rnd(-1,1))*rnd(2,5),vy:rnd(2,5)};
     const humanKept=match.mode==="ia"&&!shooterIsA;
-    bigWord(humanKept?"QUEL ARRÊT !":"ARRÊTÉ !",humanKept?"b":"r");
+    const label=saveCategory==="doigts"?"SAUVÉ DU BOUT DES DOIGTS !"
+      :saveCategory==="moyen"?"REPOUSSÉ !"
+      :saveCategory==="fort"?(caught?"CAPTÉ !":"REPOUSSÉ EN SÉCURITÉ !")
+      :"QUEL ARRÊT !";
+    bigWord(humanKept?label:"ARRÊTÉ !",humanKept?"b":"r");
     if(humanKept){AU.cheer(match.decisive);}else AU.aww();
     if(!save.reduceMotion)shake(6);
   }
@@ -1992,12 +2037,18 @@ function layoutZoneGrid(){
 function showZoneGrid(secret,cb){
   const g=$("#zone-grid"); g.innerHTML="";
   layoutZoneGrid();
+  const shownAt=performance.now();
   // ordre visuel : rangée haute puis basse ; zones logiques : row0=bas,row1=haut
+  // maintien court = extension courte (rapide) ; maintien long = extension maximale (grande portée, plus lent)
   [1,0].forEach(row=>{ for(let col=0;col<3;col++){
     const z=document.createElement("div"); z.className="zone";
-    z.onpointerdown=ev=>{ev.stopPropagation();AU.ui();buzz(15);
-      z.classList.add("pick");
-      setTimeout(()=>cb(row*3+col),secret?250:80);};
+    let downAt=0;
+    z.onpointerdown=ev=>{ev.stopPropagation();AU.ui();buzz(15); downAt=performance.now();
+      z.classList.add("pick");};
+    z.onpointerup=ev=>{ev.stopPropagation();
+      const holdMs=performance.now()-downAt, reactMs=downAt-shownAt;
+      const extension=holdMs<180?"courte":holdMs<420?"normale":"maximale";
+      setTimeout(()=>cb(row*3+col,extension,reactMs),secret?250:60);};
     g.appendChild(z);
   }});
   g.classList.add("show");
@@ -2037,37 +2088,34 @@ function drawAimOverlay(){
     ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
     ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
 
-    const pos=currentPowerPos();
-    const inSweet=pos>=match.sweetLo&&pos<=match.sweetHi;
-    if(inSweet&&!match.wasInSweet)buzz(9);
-    match.wasInSweet=inSweet;
-
-    // jauge oscillante avec zone dorée à toucher
+    // jauge : maintien = puissance (remplissage), curseur oscillant = réflexe de timing
     const gw=Math.min(240,W*.72), gx=W/2-gw/2, gy=H*.80, gh=24;
-    const pulse=inSweet?1+Math.sin(performance.now()/60)*.05:1;
-    ctx.save(); ctx.translate(W/2,gy+gh/2); ctx.scale(pulse,pulse); ctx.translate(-W/2,-(gy+gh/2));
     ctx.fillStyle="rgba(8,16,36,.8)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
     ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
     roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
-    // dégradé de fond faible→fort
-    const bg=ctx.createLinearGradient(gx,0,gx+gw,0);
-    bg.addColorStop(0,"rgba(37,168,255,.35)"); bg.addColorStop(.7,"rgba(63,214,255,.4)"); bg.addColorStop(1,"rgba(255,90,60,.4)");
-    ctx.fillStyle=bg; roundRectPath(ctx,gx+3,gy+3,gw-6,gh-6,(gh-6)/2); ctx.fill();
-    // zone dorée (cible de puissance parfaite)
-    const sx=gx+gw*match.sweetLo, sw=gw*(match.sweetHi-match.sweetLo);
-    ctx.fillStyle=inSweet?"rgba(255,224,140,.95)":"rgba(242,193,78,.8)";
-    roundRectPath(ctx,sx,gy+2,sw,gh-4,4); ctx.fill();
-    if(inSweet){ ctx.strokeStyle="#fff4c2"; ctx.lineWidth=2; roundRectPath(ctx,sx-2,gy,sw+4,gh,6); ctx.stroke(); }
-    ctx.restore();
-    // curseur mobile
-    const cx=gx+gw*pos;
-    ctx.fillStyle="#ffffff"; ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(cx,gy-9); ctx.lineTo(cx-8,gy-1); ctx.lineTo(cx+8,gy-1); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    const label=inSweet?"ZONE PARFAITE — TOUCHE !":"TOUCHE L'ÉCRAN AU BON MOMENT";
-    ctx.font=`900 ${inSweet?15:13}px -apple-system,sans-serif`;
-    ctx.fillStyle=inSweet?"#fff4c2":"#8fa3c8";
-    ctx.textAlign="center"; ctx.fillText(label,W/2,gy-16);
+
+    if(match.holdStart==null){
+      ctx.font="900 14px -apple-system,sans-serif"; ctx.fillStyle="#8fb6e6";
+      ctx.textAlign="center"; ctx.fillText("TOUCHE ET MAINTIENS",W/2,gy-14);
+    } else {
+      const heldS=(performance.now()-match.holdStart)/1000;
+      const pw2=clamp(heldS/TEMPS_MAX_MAINTIEN,0,1);
+      const bg=ctx.createLinearGradient(gx,0,gx+gw,0);
+      bg.addColorStop(0,"#25a8ff"); bg.addColorStop(.55,"#3fd6ff"); bg.addColorStop(.85,"#f2c14e"); bg.addColorStop(1,"#ff5a3c");
+      ctx.fillStyle=bg; roundRectPath(ctx,gx+3,gy+3,(gw-6)*pw2,gh-6,(gh-6)/2); ctx.fill();
+      // curseur de réflexe (timing) : oscille indépendamment du remplissage
+      const timPos=currentTimingPos(), good=timPos<0.18;
+      const cx=gx+gw*timPos;
+      ctx.fillStyle=good?"#fff4c2":"#ffffff"; ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(cx,gy-9); ctx.lineTo(cx-8,gy-1); ctx.lineTo(cx+8,gy-1); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      const tier=pw2>.9?"PUISSANCE MAXIMALE":pw2>.70?"TIR PUISSANT":pw2>.30?"TIR ÉQUILIBRÉ":"TIR PLACÉ";
+      ctx.font=`900 ${good?15:13}px -apple-system,sans-serif`;
+      ctx.fillStyle=good?"#fff4c2":"#8fa3c8";
+      ctx.textAlign="center"; ctx.fillText(tier+(good?" — LÂCHE !":""),W/2,gy-16);
+      if(good&&!match._timBuzzed){ match._timBuzzed=true; buzz(9); }
+      if(!good)match._timBuzzed=false;
+    }
   }
 }
 
@@ -2164,7 +2212,7 @@ function openSalon(code,isHost){
 function applyMatchEvent(ev,p){
   if(ev==="zone"&&p){
     if((p.mk||null)!==(match.cup?match.cup.mk:null))return; // pas mon match en cours
-    match.pendingZones[p.k]=p.z;
+    match.pendingZones[p.k]={z:p.z,ext:p.ext,qt:p.qt};
     if(p.k===match.kickIdx&&match.phase==="waitzone"&&match.turn===NET.role){
       clearTimeout(match.waitTimer); beginAim(); }
   }
