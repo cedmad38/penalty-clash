@@ -1429,7 +1429,7 @@ function updateScoreUI(){
     }
     const isTurn=(si===0&&match.turn==="A")||(si===1&&match.turn==="B");
     const idx=arr.length;
-    if(isTurn&&idx<dots.length&&(match.phase==="aim"||match.phase==="power"||match.phase==="guess"||match.phase==="run"))dots[idx].classList.add("next");
+    if(isTurn&&idx<dots.length&&(match.phase==="aim"||match.phase==="guess"||match.phase==="run"))dots[idx].classList.add("next");
   });
 }
 /* — qui tire, qui garde — */
@@ -1541,7 +1541,7 @@ function beginAim(){
   shooter.visible=true; shooter.run=0;
   gk.kit=match.mode==="2p"?(match.turn==="A"?KIT_GK_AI:KIT_GK_P):KIT_GK_AI;
   if(!match.decisive)banner(match.mode==="2p"?(match.turn==="A"?match.names[0]:match.names[1])+" — TIRE !":"À TOI DE TIRER","gold-t");
-  hint("Glisse depuis le ballon vers le but pour viser");
+  hint("Glisse pour viser, maintiens pour charger, relâche au bon moment");
   updateScoreUI();
 }
 /* — puissance en 2 temps : viser, puis toucher la jauge pile sur la zone dorée — */
@@ -1553,19 +1553,13 @@ function currentTimingPos(){
   const f=(el/period)%2;
   return f<1?f:2-f; // 0 → 1 → 0 ; 0 = relâchement idéal
 }
-function beginPowerCharge(target){
-  match.phase="power";
-  match.powerTarget=target;
-  match.holdStart=null;
-  hint("Touche et maintiens pour charger, relâche au bon moment !");
-}
-function lockPower(){
-  if(match.phase!=="power"||match.holdStart==null)return;
+function lockPower(target){
+  if(match.phase!=="aim"||match.holdStart==null)return;
   const heldS=(performance.now()-match.holdStart)/1000;
   const erreurTiming=currentTimingPos();
   match.holdStart=null;
   const puissance=clamp(heldS/TEMPS_MAX_MAINTIEN,0,1);
-  const t=match.powerTarget;
+  const t=target;
   const xvNorm=t.x/(GOAL.w/2), yvNorm=t.y/GOAL.h;
   const diff=difficulteCadrage(xvNorm,yvNorm);
   const penP=Math.max(0,puissance-0.70)*1.8;
@@ -1616,30 +1610,26 @@ function startAIRun(){
   }
 }
 
-/* — visée du joueur (drag) — */
+/* — visée + puissance en UN SEUL geste continu : poser le doigt, glisser pour viser,
+   maintenir pour charger la puissance (le curseur de réflexe oscille pendant ce temps),
+   relâcher pour tirer. Ne JAMAIS exiger de lever le doigt entre les étapes. — */
 const drag={on:false,sx:0,sy:0,cx:0,cy:0};
 canvas.addEventListener("pointerdown",e=>{
   if(state==="splash"){ return; }
-  if(state!=="match")return;
-  if(match.phase==="aim"){
-    drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY;
-  } else if(match.phase==="power"&&match.holdStart==null){
-    match.holdStart=performance.now();
-  }
+  if(state!=="match"||match.phase!=="aim")return;
+  drag.on=true; drag.sx=drag.cx=e.clientX; drag.sy=drag.cy=e.clientY;
+  match.holdStart=performance.now(); // la charge commence dès que le doigt se pose
 });
 canvas.addEventListener("pointermove",e=>{
   if(!drag.on)return; drag.cx=e.clientX; drag.cy=e.clientY;
 });
 window.addEventListener("pointerup",e=>{
-  if(state==="match"&&match.phase==="power"&&match.holdStart!=null){ lockPower(); return; }
   if(!drag.on)return; drag.on=false;
-  if(state!=="match"||match.phase!=="aim")return;
+  if(state!=="match"||match.phase!=="aim"){ match.holdStart=null; return; }
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
   const len=Math.hypot(dx,dy);
-  if(len<22)return; // trop court = annulé
-  const t=dragTarget();
-  hint("");
-  beginPowerCharge(t);
+  if(len<22){ match.holdStart=null; return; } // trop court = annulé
+  lockPower(dragTarget());
 });
 function dragTarget(){
   const dx=drag.cx-drag.sx, dy=drag.sy-drag.cy;
@@ -1674,7 +1664,9 @@ function stepMatch(dt,t){
   drawMist(st,.8);
 
   // garde-fou : si le joueur maintient sans relâcher (app en pause, distraction…), on tire quand même
-  if(match.phase==="power"&&match.holdStart!=null&&performance.now()-match.holdStart>2600)lockPower();
+  if(match.phase==="aim"&&drag.on&&match.holdStart!=null&&performance.now()-match.holdStart>4000){
+    drag.on=false; lockPower(dragTarget());
+  }
 
   if(match.phase==="run"){
     match.timer+=dt;
@@ -1946,7 +1938,7 @@ function countUp(sel,val,dur,prefix){
 function drawShooter(t){
   const kit=match.turn==="A"?match.kits[0]:match.kits[1];
   let px,pz,pose={},facing=1;
-  if(match.phase==="aim"||match.phase==="power"||match.phase==="guess"||match.phase==="secretpick"||match.phase==="waitzone"){
+  if(match.phase==="aim"||match.phase==="guess"||match.phase==="secretpick"||match.phase==="waitzone"){
     // attente : respiration + regard vers le but
     const br=Math.sin(t*2.2)*.02;
     px=1.05; pz=-1.05;
@@ -2058,68 +2050,45 @@ function showZoneGrid(secret,cb){
 }
 function hideZoneGrid(){ $("#zone-grid").classList.remove("show"); }
 
-/* visée : flèche + réticule pendant le drag */
+/* visée + puissance : un seul geste continu — réticule qui suit le doigt, jauge qui
+   se remplit tant qu'on maintient, curseur de réflexe qui oscille pour le timing */
 function drawAimOverlay(){
   if(state!=="match")return;
-  if(match.phase==="aim"&&drag.on){
-    const t=dragTarget();
-    const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
-    const b=proj(0,.11,0);
-    ctx.strokeStyle="rgba(63,214,255,.65)"; ctx.lineWidth=3; ctx.setLineDash([7,9]);
-    ctx.beginPath(); ctx.moveTo(b.x,b.y);
-    ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
-    ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
-    ctx.font="700 13px -apple-system,sans-serif"; ctx.fillStyle="rgba(200,220,250,.85)";
-    ctx.textAlign="center"; ctx.fillText("Lâche pour viser cette zone",W/2,H*.80);
-    return;
-  }
-  if(match.phase==="power"){
-    // réticule figé sur la cible choisie à l'étape précédente
-    const t=match.powerTarget;
-    const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
-    const b=proj(0,.11,0);
-    ctx.strokeStyle="rgba(63,214,255,.55)"; ctx.lineWidth=2.5; ctx.setLineDash([7,9]);
-    ctx.beginPath(); ctx.moveTo(b.x,b.y);
-    ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
-    ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
+  if(match.phase!=="aim"||!drag.on)return;
+  const t=dragTarget();
+  const p=proj(clamp(t.x,-4.4,4.4),clamp(t.y,.05,3.2),GOAL.z);
+  const b=proj(0,.11,0);
+  ctx.strokeStyle="rgba(63,214,255,.65)"; ctx.lineWidth=3; ctx.setLineDash([7,9]);
+  ctx.beginPath(); ctx.moveTo(b.x,b.y);
+  ctx.quadraticCurveTo((b.x+p.x)/2,Math.min(b.y,p.y)-40,p.x,p.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle="rgba(242,193,78,.95)"; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(p.x,p.y,13,0,TAU); ctx.stroke();
+  ctx.beginPath(); ctx.arc(p.x,p.y,4,0,TAU);
+  ctx.fillStyle="rgba(242,193,78,.95)"; ctx.fill();
 
-    // jauge : maintien = puissance (remplissage), curseur oscillant = réflexe de timing
-    const gw=Math.min(240,W*.72), gx=W/2-gw/2, gy=H*.80, gh=24;
-    ctx.fillStyle="rgba(8,16,36,.8)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
-    ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
-    roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
+  // jauge : le maintien remplit la puissance, un curseur oscillant donne le réflexe de timing
+  const gw=Math.min(240,W*.72), gx=W/2-gw/2, gy=H*.80, gh=24;
+  ctx.fillStyle="rgba(8,16,36,.8)"; roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.fill();
+  ctx.strokeStyle="rgba(140,190,255,.35)"; ctx.lineWidth=1.5;
+  roundRectPath(ctx,gx,gy,gw,gh,gh/2); ctx.stroke();
 
-    if(match.holdStart==null){
-      ctx.font="900 14px -apple-system,sans-serif"; ctx.fillStyle="#8fb6e6";
-      ctx.textAlign="center"; ctx.fillText("TOUCHE ET MAINTIENS",W/2,gy-14);
-    } else {
-      const heldS=(performance.now()-match.holdStart)/1000;
-      const pw2=clamp(heldS/TEMPS_MAX_MAINTIEN,0,1);
-      const bg=ctx.createLinearGradient(gx,0,gx+gw,0);
-      bg.addColorStop(0,"#25a8ff"); bg.addColorStop(.55,"#3fd6ff"); bg.addColorStop(.85,"#f2c14e"); bg.addColorStop(1,"#ff5a3c");
-      ctx.fillStyle=bg; roundRectPath(ctx,gx+3,gy+3,(gw-6)*pw2,gh-6,(gh-6)/2); ctx.fill();
-      // curseur de réflexe (timing) : oscille indépendamment du remplissage
-      const timPos=currentTimingPos(), good=timPos<0.18;
-      const cx=gx+gw*timPos;
-      ctx.fillStyle=good?"#fff4c2":"#ffffff"; ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.moveTo(cx,gy-9); ctx.lineTo(cx-8,gy-1); ctx.lineTo(cx+8,gy-1); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-      const tier=pw2>.9?"PUISSANCE MAXIMALE":pw2>.70?"TIR PUISSANT":pw2>.30?"TIR ÉQUILIBRÉ":"TIR PLACÉ";
-      ctx.font=`900 ${good?15:13}px -apple-system,sans-serif`;
-      ctx.fillStyle=good?"#fff4c2":"#8fa3c8";
-      ctx.textAlign="center"; ctx.fillText(tier+(good?" — LÂCHE !":""),W/2,gy-16);
-      if(good&&!match._timBuzzed){ match._timBuzzed=true; buzz(9); }
-      if(!good)match._timBuzzed=false;
-    }
-  }
+  const heldS=(performance.now()-match.holdStart)/1000;
+  const pw2=clamp(heldS/TEMPS_MAX_MAINTIEN,0,1);
+  const bg=ctx.createLinearGradient(gx,0,gx+gw,0);
+  bg.addColorStop(0,"#25a8ff"); bg.addColorStop(.55,"#3fd6ff"); bg.addColorStop(.85,"#f2c14e"); bg.addColorStop(1,"#ff5a3c");
+  ctx.fillStyle=bg; roundRectPath(ctx,gx+3,gy+3,(gw-6)*pw2,gh-6,(gh-6)/2); ctx.fill();
+  const timPos=currentTimingPos(), good=timPos<0.18;
+  const cx=gx+gw*timPos;
+  ctx.fillStyle=good?"#fff4c2":"#ffffff"; ctx.strokeStyle="rgba(0,0,0,.5)"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(cx,gy-9); ctx.lineTo(cx-8,gy-1); ctx.lineTo(cx+8,gy-1); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  const tier=pw2>.9?"PUISSANCE MAXIMALE":pw2>.70?"TIR PUISSANT":pw2>.30?"TIR ÉQUILIBRÉ":"TIR PLACÉ";
+  ctx.font=`900 ${good?15:13}px -apple-system,sans-serif`;
+  ctx.fillStyle=good?"#fff4c2":"#8fa3c8";
+  ctx.textAlign="center"; ctx.fillText(tier+(good?" — LÂCHE !":""),W/2,gy-16);
+  if(good&&!match._timBuzzed){ match._timBuzzed=true; buzz(9); }
+  if(!good)match._timBuzzed=false;
 }
 
 /* ---------- MENU / NAVIGATION ---------- */
