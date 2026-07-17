@@ -1513,6 +1513,7 @@ function beginOnlineKeep(){
   hint("Choisis ta zone AVANT que "+(match.turn==="A"?match.names[0]:match.names[1])+" ne frappe !");
   showZoneGrid(false,(z,ext,reactMs)=>{ hideZoneGrid(); hint("Zone choisie — il arme sa frappe…");
     const qt=qualiteTimingGardien(reactMs);
+    match.keeperZone=z; match.keeperExtension=ext; match.keeperQualiteTiming=qt; // cohérent localement aussi
     NET.send("zone",{k:match.kickIdx,z,ext,qt,mk:match.cup?match.cup.mk:null}); });
   // si le tir adverse est déjà arrivé (téléphone plus lent), le jouer maintenant
   const pk=match.pendingKicks&&match.pendingKicks[match.kickIdx];
@@ -1522,6 +1523,7 @@ function applyRemoteKick(p){
   if(match.phase!=="guess"&&match.phase!=="intro")return;
   hideZoneGrid(); hint("");
   match.aim=p.aim; match.power=p.power; match.keeperZone=p.kz;
+  match.keeperExtension=p.ext||"normale"; match.keeperQualiteTiming=p.qt!=null?p.qt:.6;
   match.kickRands=p.rands; match.kickCurve=p.curve;
   match.phase="run"; match.timer=0;
 }
@@ -1743,7 +1745,8 @@ function launchBall(){
     match.kickRands={save:Math.random(),caught:Math.random(),postIn:Math.random()};
     match.kickCurve=rnd(-.35,.35)*(1-pw*.4);
     NET.send("kick",{k:match.kickIdx,aim:match.aim,power:match.power,
-      kz:match.keeperZone,rands:match.kickRands,curve:match.kickCurve,mk:match.cup?match.cup.mk:null});
+      kz:match.keeperZone,ext:match.keeperExtension,qt:match.keeperQualiteTiming,
+      rands:match.kickRands,curve:match.kickCurve,mk:match.cup?match.cup.mk:null});
   }
   match.flight={tx:match.aim.x,ty:match.aim.y,pw,
     dur:lerp(1.15,.42,pw),
