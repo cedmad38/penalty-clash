@@ -1777,9 +1777,11 @@ function resolveShot(){
     const zc=ZONE_CENTERS_M[match.keeperZone];
     const dist=Math.hypot(a.x-zc.x,a.y-zc.y);
     const ext=match.keeperExtension||"normale";
-    const qDir=clamp(1-dist/1.8,0,1); // qualité de la lecture de direction (zone large : tolérance 1,8 m)
     const qTim=match.keeperQualiteTiming!=null?match.keeperQualiteTiming:.6;
-    const portee=1.35*qDir*qTim*EXT_MULT[ext]; // portée du gardien (m)
+    // portée du gardien (m) : dépend seulement de son geste (timing + extension), pas de la distance
+    // — sinon la distance pénalisait deux fois (une fois ici, une fois dans le test dist>rayon juste après),
+    // ce qui réduisait la portée réelle à ~1,15 m maxi au lieu des 1,8 m de tolérance visés
+    const portee=.85*qTim*EXT_MULT[ext];
     const rayon=portee+.15; // + marge géométrique du corps
     if(dist>rayon){ result="goal"; } // hors de portée : aucun contact possible
     else{
